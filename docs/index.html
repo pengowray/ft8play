@@ -175,7 +175,7 @@
 
         <h2>FT8 Encoder</h2>
         <input type="text" id="message-input" placeholder="Enter message to encode">
-        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="1000">
+        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500"> Hz
         <button id="encode-button">Encode</button>
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
@@ -500,14 +500,14 @@
             // Display packed data and symbols
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-            encodeOutput.textContent = `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
-            encodeOutput.textContent += `Symbols: ${Array.from(symbols).join('')}`;
+            encodeOutput.textContent = `Symbols: ${Array.from(symbols).join('')}\n`;
+            encodeOutput.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
 
             // Wrap symbols
-            const symbolsContainer = document.createElement('div');
-            symbolsContainer.style.wordBreak = 'break-all';
-            symbolsContainer.textContent = Array.from(symbols).join('');
-            encodeOutput.appendChild(symbolsContainer);
+            //const symbolsContainer = document.createElement('div');
+            //symbolsContainer.style.wordBreak = 'break-all';
+            //symbolsContainer.textContent = Array.from(symbols).join('');
+            //encodeOutput.appendChild(symbolsContainer);
 
             createPianoRoll(Array.from(symbols));
 
