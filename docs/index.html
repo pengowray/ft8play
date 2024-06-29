@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FT8 Encoder/Decoder</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --input-bg: #f0f0f0;
+            --button-bg: #4CAF50;
+            --button-text: #ffffff;
+
+            --costas-bg: #a9a9a9;
+            --data-bg: #737373;
+            --ramp-bg: #d0d0d0;
+        }
+
+        .dark-mode {
+            --bg-color: #222222;
+            --text-color: #f0f0f0;
+            --input-bg: #444444;
+            --button-bg: #45a049;
+            --button-text: #ffffff;
+
+            --costas-bg: #545454;
+            --data-bg: #1f1f1f;
+            --ramp-bg: #333333;
+
+            --link-color: #61dafb;
+            --link-hover-color: #a8e9ff;
+            --link-visited-color: #bb86fc;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        .dark-mode a {
+            color: var(--link-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .dark-mode a:hover {
+            color: var(--link-hover-color);
+            text-decoration: underline;
+        }
+
+        .dark-mode a:visited {
+            color: var(--link-visited-color);
+        }
+
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
+        }
+
+        button {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #encode-output, #decode-output {
+            background-color: var(--input-bg);
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        #example-messages {
+            margin-top: 20px;
+        }
+
+        #example-messages button {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        #audio-controls {
+            margin-top: 20px;
+        }
+
+        #audio-controls button {
+            margin-right: 10px;
+        }
+
+        #theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        #piano-roll {
+            margin-top: 20px;
+            display: grid;
+            gap: 1px;
+            height: 100px;
+            position: relative;
+            background-color: var(--bg-color);
+        }
+
+        #piano-roll div {
+            transition: background-color 0.1s;
+        }
+
+        #position-line {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background-color: red;
+            transition: left 0.1s;
+        }
+
+        body.dark-mode #piano-roll {
+            background-color: #333;
+        }
+
+        body:not(.dark-mode) #piano-roll {
+            background-color: #ddd;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            #theme-toggle {
+                position: static;
+                display: block;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div class="container">
+        <button id="theme-toggle">Toggle Dark Mode</button>
+<!-- 
+        <h1>FT8 Encoder/Decoder</h1> 
+-->
+
+        <h2>FT8 Encoder</h2>
+        <input type="text" id="message-input" placeholder="Enter message to encode">
+        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="1000">
+        <button id="encode-button">Encode</button>
+        <div id="audio-controls" style="display:none;">
+            <button id="play-audio">Play Audio</button>
+            <button id="play-audio-timed">Play at Next 15s Slot</button>
+            <button id="stop-audio" disabled>Stop Audio</button>
+            <button id="download-audio">Download Audio</button>
+            <div id="countdown"></div>
+        </div>
+
+        <div id="piano-roll" style="margin-top: 20px;"></div>
+        <div id="encode-output"></div>
+
+        <div id="example-messages">
+            <h3>Example Messages:</h3>
+        </div>
+
+        <h2>Who made this?</h2>
+        <div>
+            Pengo Wray (VK3PGO). Encoding library: <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
+        </div>
+
+        <div style="display: none;">
+            <h2>Decoder</h2>
+            <input type="file" id="audio-input" accept=".wav">
+            <button id="decode-button">Decode</button>
+            <div id="decode-output"></div>
+        </div>
+    </div>
+
+<script src="ft8_wasm.js"></script>
+<script>
+    const exampleMessages = [
+        "CQ K1ABC FN42",
+        "K1ABC W9XYZ -15",
+        "W9XYZ K1ABC R-17",
+        "K1ABC W9XYZ RRR",
+        "W9XYZ K1ABC 73"
+    ];
+
+    function initializeUI() {
+        const encodeButton = document.getElementById('encode-button');
+        const decodeButton = document.getElementById('decode-button');
+        const messageInput = document.getElementById('message-input');
+        const baseFreqInput = document.getElementById('base-freq-input');
+        const audioInput = document.getElementById('audio-input');
+        const encodeOutput = document.getElementById('encode-output');
+        const decodeOutput = document.getElementById('decode-output');
+        const audioControls = document.getElementById('audio-controls');
+        const playAudioButton = document.getElementById('play-audio');
+        const playAudioTimedButton = document.getElementById('play-audio-timed');
+        const stopAudioButton = document.getElementById('stop-audio');
+        const downloadAudioButton = document.getElementById('download-audio');
+        const countdownDiv = document.getElementById('countdown');
+        const themeToggle = document.getElementById('theme-toggle');
+        const exampleMessagesDiv = document.getElementById('example-messages');
+ 
+        const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number']);
+        const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
+
+        let audioSource = null;
+        let countdownInterval = null;
+        let pianoRollInterval;
+
+        function createPianoRoll(symbols) {
+            const pianoRollDiv = document.getElementById('piano-roll');
+            pianoRollDiv.innerHTML = '';
+            pianoRollDiv.style.gridTemplateColumns = `repeat(${symbols.length}, 1fr)`;
+
+            symbols.forEach((symbol, index) => {
+                const symbolDiv = document.createElement('div');
+                symbolDiv.style.backgroundColor = getSymbolBackgroundColor(index);
+                symbolDiv.style.gridRow = `${8 - symbol} / span 1`;
+                symbolDiv.style.gridColumn = `${index + 1} / span 1`;
+                symbolDiv.dataset.index = index;
+                symbolDiv.dataset.symbol = symbol;
+                pianoRollDiv.appendChild(symbolDiv);
+            });
+
+            const positionLine = document.createElement('div');
+            positionLine.id = 'position-line';
+            pianoRollDiv.appendChild(positionLine);
+        }
+
+        function getSymbolBackgroundColor(index) {
+            if (isCostasSymbol(index)) {
+                return 'var(--costas-bg)';
+            //} else if (isRampSymbol(index)) {
+            //    return 'var(--ramp-bg)';
+            } else {
+                return 'var(--data-bg)';
+            }
+        }
+
+        function isCostasSymbol(index) {
+            const costasIndices = [0, 1, 2, 3, 4, 5, 6, 36, 37, 38, 39, 40, 41, 42, 72, 73, 74, 75, 76, 77, 78];
+            return costasIndices.includes(index);
+        }
+
+        function isRampSymbol(index) {
+            // FT8 doesn't have ramp symbols, but we'll keep this function in case of other modes
+            return false;
+        }
+
+        function highlightCurrentSymbol(currentTime) {
+            const symbolDuration = audioBuffer.duration / 79; // 79 symbols in FT8
+            const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+            
+            const pianoRollDiv = document.getElementById('piano-roll');
+            const symbols = pianoRollDiv.children;
+            const positionLine = document.getElementById('position-line');
+            
+            for (let i = 0; i < symbols.length; i++) {
+                if (i === currentSymbolIndex) {
+                    symbols[i].style.backgroundColor = getHighlightColor(symbols[i].dataset.symbol);
+                } else {
+                    symbols[i].style.backgroundColor = getSymbolBackgroundColor(i);
+                }
+            }
+
+            // Update position line
+            const progress = currentTime / audioBuffer.duration;
+            positionLine.style.left = `${progress * 100}%`;
+        }
+
+        function getHighlightColor(symbol) {
+            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
+            return colors[symbol];
+        }
+
+        function getHighlightColor(symbol) {
+            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
+            return colors[symbol];
+        }
+
+        function playAudio() {
+            if (audioBuffer && !audioSource) {
+                audioContext.resume().then(() => {
+                    audioSource = audioContext.createBufferSource();
+                    audioSource.buffer = audioBuffer;
+                    audioSource.connect(audioContext.destination);
+                    audioSource.start();
+                    audioSource.onended = resetAudioState;
+                    updateButtonState(true);
+
+                    const startTime = audioContext.currentTime;
+                    pianoRollInterval = setInterval(() => {
+                        const currentTime = audioContext.currentTime - startTime;
+                        highlightCurrentSymbol(currentTime);
+                        if (currentTime >= audioBuffer.duration) {
+                            clearInterval(pianoRollInterval);
+                        }
+                    }, 50); // Update every 50ms
+                });
+            }
+        }
+
+        function stopAudio() {
+            if (audioSource) {
+                audioSource.stop();
+                resetAudioState();
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                countdownDiv.style.display = 'none';
+            }
+            if (pianoRollInterval) {
+                clearInterval(pianoRollInterval);
+                pianoRollInterval = null;
+            }
+            updateButtonState(false);
+        }
+
+        function resetAudioState() {
+            audioSource = null;
+            updateButtonState(false);
+            if (pianoRollInterval) {
+                clearInterval(pianoRollInterval);
+                pianoRollInterval = null;
+            }
+            // Clear all highlights
+            const pianoRollDiv = document.getElementById('piano-roll');
+            const symbols = pianoRollDiv.children;
+            for (let i = 0; i < symbols.length; i++) {
+                symbols[i].style.boxShadow = 'none';
+            }
+        }
+
+        function updateButtonState(isPlaying) {
+            playAudioButton.disabled = isPlaying;
+            playAudioTimedButton.disabled = isPlaying;
+            stopAudioButton.disabled = !isPlaying;
+            downloadAudioButton.disabled = isPlaying;
+        }
+
+        function playAudioTimed() {
+            if (audioBuffer && !audioSource) {
+                const now = new Date();
+                const secondsUntilNext15 = 15 - (now.getSeconds() % 15);
+                let totalSeconds = secondsUntilNext15;
+
+                updateButtonState(true);
+                countdownDiv.style.display = 'block';
+
+                function updateCountdown() {
+                    const minutes = Math.floor(totalSeconds / 60);
+                    const seconds = totalSeconds % 60;
+                    countdownDiv.textContent = `Playing in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    if (totalSeconds <= 0) {
+                        clearInterval(countdownInterval);
+                        countdownInterval = null;
+                        countdownDiv.style.display = 'none';
+                        playAudio();
+                    }
+                    totalSeconds--;
+                }
+
+                updateCountdown(); // Call immediately to show correct time
+                countdownInterval = setInterval(updateCountdown, 1000);
+            }
+        }
+
+        playAudioButton.addEventListener('click', playAudio);
+        playAudioTimedButton.addEventListener('click', playAudioTimed);
+        stopAudioButton.addEventListener('click', stopAudio);
+
+        function downloadAudio() {
+            if (audioBuffer) {
+                const wavData = audioBufferToWav(audioBuffer);
+                const blob = new Blob([wavData], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                const message = messageInput.value.replace(/\s+/g, '_');
+                a.download = `FT8-${baseFreq}Hz_${message}.wav`;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }
+        }
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1; // PCM
+            const bitDepth = 16;
+
+            let byteRate = sampleRate * numChannels * bitDepth / 8;
+            let blockAlign = numChannels * bitDepth / 8;
+            let dataSize = buffer.length * numChannels * bitDepth / 8;
+            let headerSize = 44;
+            let totalSize = headerSize + dataSize;
+
+            let arrayBuffer = new ArrayBuffer(totalSize);
+            let view = new DataView(arrayBuffer);
+
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, totalSize - 8, true);
+            writeString(view, 8, 'WAVE');
+
+            // FMT sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // subchunk1size (16 for PCM)
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitDepth, true);
+
+            // Data sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write the PCM samples
+            let offset = 44;
+            for (let i = 0; i < buffer.length; i++) {
+                for (let channel = 0; channel < numChannels; channel++) {
+                    let sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(offset, sample, true);
+                    offset += 2;
+                }
+            }
+
+            return arrayBuffer;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        downloadAudioButton.addEventListener('click', downloadAudio);
+
+        encodeButton.addEventListener('click', () => {
+            const message = messageInput.value;
+            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+            const resultPtr = encodeFT8(message, baseFreq);
+            
+            if (resultPtr === 0) {
+                encodeOutput.textContent = "Error: Invalid message format";
+                return;
+            }
+
+            const result = {
+                packed_data: Module.getValue(resultPtr, '*'),
+                packed_size: Module.getValue(resultPtr + 4, 'i32'),
+                symbols: Module.getValue(resultPtr + 8, '*'),
+                symbol_count: Module.getValue(resultPtr + 12, 'i32'),
+                audio: Module.getValue(resultPtr + 16, '*'),
+                audio_samples: Module.getValue(resultPtr + 20, 'i32')
+            };
+
+            // Display packed data and symbols
+            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
+            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+            encodeOutput.textContent = `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
+            encodeOutput.textContent += `Symbols: ${Array.from(symbols).join('')}`;
+
+            // Wrap symbols
+            const symbolsContainer = document.createElement('div');
+            symbolsContainer.style.wordBreak = 'break-all';
+            symbolsContainer.textContent = Array.from(symbols).join('');
+            encodeOutput.appendChild(symbolsContainer);
+
+            createPianoRoll(Array.from(symbols));
+
+            // Create audio buffer
+            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
+            const channelData = audioBuffer.getChannelData(0);
+            channelData.set(audioSamples);
+
+            audioControls.style.display = 'block';
+            updateButtonState(false);
+            countdownDiv.style.display = 'none';
+
+            // Recreate the audio context to ensure it's in a clean state
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Free the memory allocated in C
+            freeFT8Result(resultPtr);
+        });
+
+        playAudioButton.addEventListener('click', playAudio);
+        downloadAudioButton.addEventListener('click', downloadAudio);
+
+        decodeButton.addEventListener('click', () => {
+            const file = audioInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const audioData = new Float32Array(e.target.result);
+                    const dataPtr = Module._malloc(audioData.length * 4);
+                    Module.HEAPF32.set(audioData, dataPtr / 4);
+                    const result = decodeFT8(dataPtr, audioData.length);
+                    Module._free(dataPtr);
+                    decodeOutput.textContent = result;
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+        });
+
+        playAudioButton.addEventListener('click', playAudio);
+        downloadAudioButton.addEventListener('click', downloadAudio);
+
+        exampleMessages.forEach(message => {
+            const button = document.createElement('button');
+            button.textContent = message;
+            button.addEventListener('click', () => {
+                messageInput.value = message;
+                encodeButton.click();
+            });
+            exampleMessagesDiv.appendChild(button);
+        });
+    }
+
+    if (typeof Module !== 'undefined') {
+        Module.onRuntimeInitialized = initializeUI;
+    } else {
+        document.addEventListener('DOMContentLoaded', initializeUI);
+    }
+</script>
+</body>
+</html>
