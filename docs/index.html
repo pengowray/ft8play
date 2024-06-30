@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FT8 Encoder/Decoder</title>
+    <title>FT8 Encoder by VK3PGO</title>
     <style>
         :root {
             --bg-color: #ffffff;
@@ -186,15 +186,15 @@
         </div>
 
         <div id="piano-roll" style="margin-top: 20px;"></div>
-        <div id="encode-output"></div>
+        <div id="output"></div>
 
         <div id="example-messages">
             <h3>Example Messages:</h3>
         </div>
 
-        <h2>Who made this?</h2>
+        <!--<h2>Who made this?</h2>-->
         <div>
-            Pengo Wray (VK3PGO). Encoding library: <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
+            Created by Pengo Wray (VK3PGO). Encoding library: <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
         </div>
 
         <div style="display: none;">
@@ -221,8 +221,9 @@
         const messageInput = document.getElementById('message-input');
         const baseFreqInput = document.getElementById('base-freq-input');
         const audioInput = document.getElementById('audio-input');
-        const encodeOutput = document.getElementById('encode-output');
-        const decodeOutput = document.getElementById('decode-output');
+        const encodeOutput = document.getElementById('output');
+        const output = document.getElementById('output');
+        //const decodeOutput = document.getElementById('decode-output');
         const audioControls = document.getElementById('audio-controls');
         const playAudioButton = document.getElementById('play-audio');
         const playAudioTimedButton = document.getElementById('play-audio-timed');
@@ -231,13 +232,52 @@
         const countdownDiv = document.getElementById('countdown');
         const themeToggle = document.getElementById('theme-toggle');
         const exampleMessagesDiv = document.getElementById('example-messages');
- 
+
         const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number']);
         const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
+        //const decodeFT8Symbols = Module.cwrap('decodeFT8Symbols', 'string', ['number', 'number']);
+        //const decodeFT8PackedData = Module.cwrap('decodeFT8PackedData', 'string', ['number', 'number']);
+        const decodeFT8Symbols = (symbolsPtr, length) => {
+            const resultPtr = Module.ccall('decodeFT8Symbols', 'number', ['number', 'number'], [symbolsPtr, length]);
+            if (resultPtr === 0) {
+                console.error("Decoding failed");
+                return null;
+            }
+            const result = Module.UTF8ToString(resultPtr);
+            Module._free(resultPtr);
+            return result;
+        };
+        const decodeFT8PackedData = (packedPtr, length) => {
+            const resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedPtr, length]);
+            if (resultPtr === 0) return null;
+            const result = Module.UTF8ToString(resultPtr);
+            Module._free(resultPtr);
+            return result;
+        };
 
+        let audioContext = null;
+        let audioBuffer = null;
         let audioSource = null;
         let countdownInterval = null;
-        let pianoRollInterval;
+
+        function normalizeInput(input) {
+            return input.trim().toUpperCase().replace(/\s+/g, ' ');
+        }
+
+        function detectInputType(input) {
+            // Remove all whitespace
+            const cleanInput = input.replace(/\s+/g, '');
+            // Check if input is 79 numbers (symbols); numbers are always 1 digit
+            if (/^\d{79}$/.test(cleanInput)) {
+                return 'symbols';
+            }
+            // Check if input is hex string (packed data)
+            if (/^([0-9A-Fa-f]{2}){10}$/.test(cleanInput)) {
+                return 'packed';
+            }
+            // Otherwise, assume it's a message
+            return 'message';
+        }
 
         function createPianoRoll(symbols) {
             const pianoRollDiv = document.getElementById('piano-roll');
@@ -479,12 +519,30 @@
         downloadAudioButton.addEventListener('click', downloadAudio);
 
         encodeButton.addEventListener('click', () => {
-            const message = messageInput.value;
+
+  const input = normalizeInput(messageInput.value);
+            const inputType = detectInputType(input);
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            const resultPtr = encodeFT8(message, baseFreq);
             
+            let resultPtr;
+            if (inputType === 'symbols') {
+                const symbols = input.replace(/\s+/g, '').split('').map(Number);
+                const symbolsPtr = Module._malloc(symbols.length);
+                Module.HEAPU8.set(symbols, symbolsPtr);
+                resultPtr = Module.ccall('decodeFT8Symbols', 'number', ['number', 'number'], [symbolsPtr, symbols.length]);
+                Module._free(symbolsPtr);
+            } else if (inputType === 'packed') {
+                const packed = input.replace(/\s+/g, '').match(/.{1,2}/g).map(hex => parseInt(hex, 16));
+                const packedPtr = Module._malloc(packed.length);
+                Module.HEAPU8.set(packed, packedPtr);
+                resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedPtr, packed.length]);
+                Module._free(packedPtr);
+            } else {
+                resultPtr = encodeFT8(input, baseFreq);
+            }
+
             if (resultPtr === 0) {
-                encodeOutput.textContent = "Error: Invalid message format";
+                output.innerHTML = "Error: Invalid input";
                 return;
             }
 
@@ -494,14 +552,34 @@
                 symbols: Module.getValue(resultPtr + 8, '*'),
                 symbol_count: Module.getValue(resultPtr + 12, 'i32'),
                 audio: Module.getValue(resultPtr + 16, '*'),
-                audio_samples: Module.getValue(resultPtr + 20, 'i32')
+                audio_samples: Module.getValue(resultPtr + 20, 'i32'),
+                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'))
             };
 
-            // Display packed data and symbols
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-            encodeOutput.textContent = `Symbols: ${Array.from(symbols).join('')}\n`;
-            encodeOutput.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
+
+            const decodedMatches = normalizeInput(result.decoded_text) === input;
+            const decodedStyle = decodedMatches ? '' : 'color: red;';
+
+            output.innerHTML = `Symbols: ${Array.from(symbols).join('')}<br>`;
+            output.innerHTML += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
+            output.innerHTML += `<span style="${decodedStyle}">Decoded: ${result.decoded_text}</span><br>`;
+            output.innerHTML += `Input type: ${inputType}`;
+
+            /*
+            encodeOutput.textContent = `Symbols: ${Array.from(symbols).join('')}`;
+            encodeOutput.textContent += `\nPacked data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
+            encodeOutput.textContent += `\nDecoded: ${result.decoded_text}`;
+            encodeOutput.textContent += `\nInput type: ${inputType}`;
+*/
+            
+/*
+            output.textContent = `Input type: ${inputType}\n`;
+            output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
+            output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
+            output.textContent += `Decoded: ${result.decoded_text}\n`;
+*/
 
             // Wrap symbols
             //const symbolsContainer = document.createElement('div');
@@ -533,23 +611,73 @@
         downloadAudioButton.addEventListener('click', downloadAudio);
 
         decodeButton.addEventListener('click', () => {
-            const file = audioInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const audioData = new Float32Array(e.target.result);
-                    const dataPtr = Module._malloc(audioData.length * 4);
-                    Module.HEAPF32.set(audioData, dataPtr / 4);
-                    const result = decodeFT8(dataPtr, audioData.length);
-                    Module._free(dataPtr);
-                    decodeOutput.textContent = result;
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
+            const input = messageInput.value;
+            const inputType = detectInputType(input);
+            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
 
-        themeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
+            output.textContent = `Input type: ${inputType}\n`;
+
+            if (inputType === 'symbols') {
+                const symbols = input.split(/\s+/).map(Number);
+                const symbolsPtr = Module._malloc(symbols.length);
+                Module.HEAPU8.set(symbols, symbolsPtr);
+                const decodedText = decodeFT8Symbols(symbolsPtr, symbols.length);
+                Module._free(symbolsPtr);
+
+                output.textContent += `Decoded: ${decodedText}\n`;
+                createPianoRoll(symbols);
+            } else if (inputType === 'packed') {
+                const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
+                const packedPtr = Module._malloc(packed.length);
+                Module.HEAPU8.set(packed, packedPtr);
+                const decodedText = decodeFT8PackedData(packedPtr, packed.length);
+                Module._free(packedPtr);
+
+                output.textContent += `Decoded: ${decodedText}\n`;
+                // Generate symbols from packed data for piano roll
+                const symbolsPtr = Module._malloc(79);
+                Module.ccall('ft8_encode', null, ['number', 'number'], [packedPtr, symbolsPtr]);
+                const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, 79);
+                createPianoRoll(Array.from(symbols));
+                Module._free(symbolsPtr);
+            } else {
+                const resultPtr = encodeFT8(input, baseFreq);
+
+                if (resultPtr === 0) {
+                    output.textContent += "Error: Invalid message format\n";
+                    return;
+                }
+
+                const result = {
+                    packed_data: Module.getValue(resultPtr, '*'),
+                    packed_size: Module.getValue(resultPtr + 4, 'i32'),
+                    symbols: Module.getValue(resultPtr + 8, '*'),
+                    symbol_count: Module.getValue(resultPtr + 12, 'i32'),
+                    audio: Module.getValue(resultPtr + 16, '*'),
+                    audio_samples: Module.getValue(resultPtr + 20, 'i32')
+                };
+
+                const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
+                const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+
+                output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
+                output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
+
+                createPianoRoll(Array.from(symbols));
+
+                // Create audio buffer
+                const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
+                const channelData = audioBuffer.getChannelData(0);
+                channelData.set(audioSamples);
+
+                audioControls.style.display = 'block';
+                updateButtonState(false);
+                countdownDiv.style.display = 'none';
+
+                freeFT8Result(resultPtr);
+            }
         });
 
         playAudioButton.addEventListener('click', playAudio);
@@ -564,6 +692,11 @@
             });
             exampleMessagesDiv.appendChild(button);
         });
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+        });
+
     }
 
     if (typeof Module !== 'undefined') {
