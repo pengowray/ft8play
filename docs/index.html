@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FT8 Encoder by VK3PGO</title>
+    <title>VK3PGO FT8 Encoder/Decoder</title>
     <style>
         :root {
             --bg-color: #ffffff;
@@ -88,7 +88,7 @@
             opacity: 0.9;
         }
 
-        #encode-output, #decode-output {
+        #encode-output, #decode-output, #output {
             background-color: var(--input-bg);
             padding: 10px;
             margin-top: 10px;
@@ -173,9 +173,9 @@
         <h1>FT8 Encoder/Decoder</h1> 
 -->
 
-        <h2>FT8 Encoder</h2>
+        <h2>VK3PGO FT8 Encoder / Audio Generator</h2>
         <input type="text" id="message-input" placeholder="Enter message to encode">
-        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500"> Hz
+        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500">
         <button id="encode-button">Encode</button>
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
@@ -186,13 +186,13 @@
         </div>
 
         <div id="piano-roll" style="margin-top: 20px;"></div>
+        <div id="frequency-graph" style="margin-top: 20px;"></div>
         <div id="output"></div>
 
         <div id="example-messages">
             <h3>Example Messages:</h3>
         </div>
 
-        <!--<h2>Who made this?</h2>-->
         <div>
             Created by Pengo Wray (VK3PGO). Encoding library: <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
         </div>
@@ -205,6 +205,7 @@
         </div>
     </div>
 
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>
 <script>
     const exampleMessages = [
@@ -233,7 +234,7 @@
         const themeToggle = document.getElementById('theme-toggle');
         const exampleMessagesDiv = document.getElementById('example-messages');
 
-        const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number']);
+        const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number', 'number']);
         const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
         //const decodeFT8Symbols = Module.cwrap('decodeFT8Symbols', 'string', ['number', 'number']);
         //const decodeFT8PackedData = Module.cwrap('decodeFT8PackedData', 'string', ['number', 'number']);
@@ -260,23 +261,55 @@
         let audioSource = null;
         let countdownInterval = null;
 
-        function normalizeInput(input) {
-            return input.trim().toUpperCase().replace(/\s+/g, ' ');
+        function normalizeMessage(message) {
+            return message.trim().toUpperCase().replace(/\s+/g, ' ');
+        }
+
+        function normalizeSymbols(input) {
+            // numbers only
+            return input.replace(/[-\s]/g, '');
+        }
+
+        function normalizePackedData(input) {
+            return input.replace(/[-\s]/g, '').toUpperCase();
         }
 
         function detectInputType(input) {
-            // Remove all whitespace
-            const cleanInput = input.replace(/\s+/g, '');
-            // Check if input is 79 numbers (symbols); numbers are always 1 digit
-            if (/^\d{79}$/.test(cleanInput)) {
+            input = input.trim();
+
+            if (/^[0-7]{79}$/.test(input)) {
                 return 'symbols';
             }
             // Check if input is hex string (packed data)
-            if (/^([0-9A-Fa-f]{2}){10}$/.test(cleanInput)) {
+            if (/^([0-9A-Fa-f]{2}[-\s]?){10}$/.test(input)) {
                 return 'packed';
             }
             // Otherwise, assume it's a message
             return 'message';
+        }
+
+
+        function updateOutput(result, inputType, originalInput) {
+            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
+            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+
+            output.innerHTML = '';
+            if (inputType !== 'message') {
+                output.innerHTML += `Input type: ${inputType}<br>`;
+            }
+            output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
+            output.innerHTML += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
+
+            const decodedSpan = document.createElement('span');
+            decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
+            if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {
+                decodedSpan.style.color = 'red';
+            }
+
+            output.appendChild(decodedSpan);
+            output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text)}<br>`;
+
+            createPianoRoll(Array.from(symbols));
         }
 
         function createPianoRoll(symbols) {
@@ -296,6 +329,7 @@
 
             const positionLine = document.createElement('div');
             positionLine.id = 'position-line';
+            positionLine.style.display = 'none'; // Initially hidden
             pianoRollDiv.appendChild(positionLine);
         }
 
@@ -396,11 +430,44 @@
                 clearInterval(pianoRollInterval);
                 pianoRollInterval = null;
             }
+            // Hide position line
+            const positionLine = document.getElementById('position-line');
+            if (positionLine) {
+                positionLine.style.display = 'none';
+            }
             // Clear all highlights
             const pianoRollDiv = document.getElementById('piano-roll');
             const symbols = pianoRollDiv.children;
             for (let i = 0; i < symbols.length; i++) {
-                symbols[i].style.boxShadow = 'none';
+                symbols[i].style.backgroundColor = getSymbolBackgroundColor(i);
+            }
+        }
+
+        function playAudio() {
+            if (audioBuffer && !audioSource) {
+                audioContext.resume().then(() => {
+                    audioSource = audioContext.createBufferSource();
+                    audioSource.buffer = audioBuffer;
+                    audioSource.connect(audioContext.destination);
+                    audioSource.start();
+                    audioSource.onended = resetAudioState;
+                    updateButtonState(true);
+
+                    // Show position line
+                    const positionLine = document.getElementById('position-line');
+                    positionLine.style.display = 'block';
+                    positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
+
+                    const startTime = audioContext.currentTime;
+                    pianoRollInterval = setInterval(() => {
+                        const currentTime = audioContext.currentTime - startTime;
+                        highlightCurrentSymbol(currentTime);
+                        if (currentTime >= audioBuffer.duration) {
+                            clearInterval(pianoRollInterval);
+                            resetAudioState();
+                        }
+                    }, 50); // Update every 50ms
+                });
             }
         }
 
@@ -519,30 +586,24 @@
         downloadAudioButton.addEventListener('click', downloadAudio);
 
         encodeButton.addEventListener('click', () => {
-
-  const input = normalizeInput(messageInput.value);
+            let input = messageInput.value;
             const inputType = detectInputType(input);
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            
+                    
             let resultPtr;
             if (inputType === 'symbols') {
-                const symbols = input.replace(/\s+/g, '').split('').map(Number);
-                const symbolsPtr = Module._malloc(symbols.length);
-                Module.HEAPU8.set(symbols, symbolsPtr);
-                resultPtr = Module.ccall('decodeFT8Symbols', 'number', ['number', 'number'], [symbolsPtr, symbols.length]);
-                Module._free(symbolsPtr);
+                input = normalizeSymbols(input);
+                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number'], [input, baseFreq]);
             } else if (inputType === 'packed') {
-                const packed = input.replace(/\s+/g, '').match(/.{1,2}/g).map(hex => parseInt(hex, 16));
-                const packedPtr = Module._malloc(packed.length);
-                Module.HEAPU8.set(packed, packedPtr);
-                resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedPtr, packed.length]);
-                Module._free(packedPtr);
+                input = normalizePackedData(input);
+                resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number'], [input, baseFreq]);
             } else {
+                input = normalizeMessage(input);
                 resultPtr = encodeFT8(input, baseFreq);
             }
 
             if (resultPtr === 0) {
-                output.innerHTML = "Error: Invalid input";
+                output.textContent = "Error: Invalid input";
                 return;
             }
 
@@ -556,38 +617,7 @@
                 decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'))
             };
 
-            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
-            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-
-            const decodedMatches = normalizeInput(result.decoded_text) === input;
-            const decodedStyle = decodedMatches ? '' : 'color: red;';
-
-            output.innerHTML = `Symbols: ${Array.from(symbols).join('')}<br>`;
-            output.innerHTML += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
-            output.innerHTML += `<span style="${decodedStyle}">Decoded: ${result.decoded_text}</span><br>`;
-            output.innerHTML += `Input type: ${inputType}`;
-
-            /*
-            encodeOutput.textContent = `Symbols: ${Array.from(symbols).join('')}`;
-            encodeOutput.textContent += `\nPacked data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
-            encodeOutput.textContent += `\nDecoded: ${result.decoded_text}`;
-            encodeOutput.textContent += `\nInput type: ${inputType}`;
-*/
-            
-/*
-            output.textContent = `Input type: ${inputType}\n`;
-            output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
-            output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
-            output.textContent += `Decoded: ${result.decoded_text}\n`;
-*/
-
-            // Wrap symbols
-            //const symbolsContainer = document.createElement('div');
-            //symbolsContainer.style.wordBreak = 'break-all';
-            //symbolsContainer.textContent = Array.from(symbols).join('');
-            //encodeOutput.appendChild(symbolsContainer);
-
-            createPianoRoll(Array.from(symbols));
+            updateOutput(result, inputType, input);
 
             // Create audio buffer
             const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
@@ -615,9 +645,8 @@
             const inputType = detectInputType(input);
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
 
-            output.textContent = `Input type: ${inputType}\n`;
-
             if (inputType === 'symbols') {
+                output.textContent = `Input type: ${inputType}\n`;
                 const symbols = input.split(/\s+/).map(Number);
                 const symbolsPtr = Module._malloc(symbols.length);
                 Module.HEAPU8.set(symbols, symbolsPtr);
@@ -625,8 +654,11 @@
                 Module._free(symbolsPtr);
 
                 output.textContent += `Decoded: ${decodedText}\n`;
+                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
+
                 createPianoRoll(symbols);
             } else if (inputType === 'packed') {
+                output.textContent = `Input type: ${inputType}\n`;
                 const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
                 const packedPtr = Module._malloc(packed.length);
                 Module.HEAPU8.set(packed, packedPtr);
@@ -634,6 +666,8 @@
                 Module._free(packedPtr);
 
                 output.textContent += `Decoded: ${decodedText}\n`;
+                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
+
                 // Generate symbols from packed data for piano roll
                 const symbolsPtr = Module._malloc(79);
                 Module.ccall('ft8_encode', null, ['number', 'number'], [packedPtr, symbolsPtr]);
@@ -641,6 +675,7 @@
                 createPianoRoll(Array.from(symbols));
                 Module._free(symbolsPtr);
             } else {
+                output.textContent = '';
                 const resultPtr = encodeFT8(input, baseFreq);
 
                 if (resultPtr === 0) {
@@ -661,8 +696,12 @@
                 const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
 
                 output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
-                output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
+                output.textContent += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
 
+                //???
+                const decodedText = Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'));
+                output.textContent += `Decoded: ${decodedText}\n`;
+                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
                 createPianoRoll(Array.from(symbols));
 
                 // Create audio buffer
@@ -693,10 +732,195 @@
             exampleMessagesDiv.appendChild(button);
         });
 
+        function explainFT8Message(message) {
+            const parts = message.trim().split(/\s+/);
+            let explanation = '';
+
+            function isValidCallsign(call) {
+                return /^[A-Z0-9]{1,6}$/.test(call);
+            }
+
+            function isGridLocator(grid) {
+                return /^[A-R]{2}[0-9]{2}([a-x]{2})?$/.test(grid);
+            }
+
+            function isReport(report) {
+                return /^[+-]?\d{2}$/.test(report);
+            }
+
+            if (parts.length === 2 && parts[0] === 'CQ') {
+                if (isValidCallsign(parts[1])) {
+                    explanation = `This is a general call (CQ) message. Station ${parts[1]} is calling CQ, looking for any station to respond.`;
+                } else {
+                    explanation = `This appears to be an incomplete or non-standard CQ message.`;
+                }
+            } else if (parts.length === 3 && parts[0] === 'CQ') {
+                if (isValidCallsign(parts[1]) && isGridLocator(parts[2])) {
+                    explanation = `This is a general call (CQ) message with location. Station ${parts[1]} is calling CQ from grid square ${parts[2]}.`;
+                } else if (/^[A-Z]{2}$/.test(parts[1]) && isValidCallsign(parts[2])) {
+                    explanation = `This is a directed CQ message. Station ${parts[2]} is calling CQ, specifically looking for stations in the ${parts[1]} region.`;
+                } else {
+                    explanation = `This appears to be a non-standard CQ message format.`;
+                }
+            } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+                if (isReport(parts[2])) {
+                    explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
+                } else if (parts[2] === 'RRR') {
+                    explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
+                } else if (parts[2] === 'RR73') {
+                    explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying goodbye to station ${parts[1]}.`;
+                } else if (parts[2] === '73') {
+                    explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
+                } else if (isGridLocator(parts[2])) {
+                    explanation = `Station ${parts[0]} is sending its grid locator ${parts[2]} to station ${parts[1]}.`;
+                } else if (parts[2].startsWith('R')) {
+                    explanation = `Station ${parts[0]} is acknowledging receipt of a message from ${parts[1]} and sending a signal report of ${parts[2].slice(1)} dB.`;
+                } else {
+                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is non-standard.`;
+                }
+            } else if (parts.length === 4 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+                if (parts[2] === 'R' && isReport(parts[3])) {
+                    explanation = `This is a signal report acknowledgment. Station ${parts[0]} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${parts[1]}.`;
+                } else {
+                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is non-standard.`;
+                }
+            } else if (message.startsWith('<') && message.endsWith('>')) {
+                explanation = `This is a free-text message: "${message}". Free-text messages in FT8 are limited to 13 characters.`;
+            } else if (/^[0-9A-F]{12}$/.test(message)) {
+                explanation = `This appears to be a telemetry message containing 12 hexadecimal digits: ${message}. The specific meaning depends on the implementation.`;
+            } else {
+                explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
+            }
+
+            return explanation;
+        }
+
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
+            const positionLine = document.getElementById('position-line');
+            if (positionLine) {
+                positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
+            }
         });
 
+        const sampleRateSelect = document.createElement('select');
+        sampleRateSelect.id = 'sample-rate-select';
+        [8000, 11025, 12000, 16000, 22050, 24000, 44100, 48000].forEach(rate => {
+            const option = document.createElement('option');
+            option.value = rate;
+            option.textContent = `${rate} Hz`;
+            if (rate === 12000) option.selected = true;
+            sampleRateSelect.appendChild(option);
+        });
+        baseFreqInput.parentNode.insertBefore(sampleRateSelect, baseFreqInput.nextSibling);
+
+        encodeButton.addEventListener('click', () => {
+            const input = normalizeMessage(messageInput.value);
+            const inputType = detectInputType(input);
+            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+            const sampleRate = parseInt(sampleRateSelect.value);
+            
+            let resultPtr;
+            if (inputType === 'symbols') {
+                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+            } else if (inputType === 'packed') {
+                //todo
+            } else {
+                resultPtr = encodeFT8(input, baseFreq, sampleRate);
+            }
+
+            if (resultPtr === 0) {
+                output.textContent = "Error: Invalid input";
+                return;
+            }
+
+            const result = {
+                packed_data: Module.getValue(resultPtr, '*'),
+                packed_size: Module.getValue(resultPtr + 4, 'i32'),
+                symbols: Module.getValue(resultPtr + 8, '*'),
+                symbol_count: Module.getValue(resultPtr + 12, 'i32'),
+                audio: Module.getValue(resultPtr + 16, '*'),
+                audio_samples: Module.getValue(resultPtr + 20, 'i32'),
+                dphi: Module.getValue(resultPtr + 24, '*'),
+                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
+                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
+                metadata_length: Module.getValue(resultPtr + 36, 'i32')
+            };
+
+            updateOutput(result, inputType, input);
+
+            // Create audio buffer
+            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+            audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
+            const channelData = audioBuffer.getChannelData(0);
+            channelData.set(audioSamples);
+
+            // Create dphi data
+            const dphiData = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
+
+            // Parse metadata
+            const metadata = JSON.parse(result.metadata);
+
+            // Create frequency graph
+            createFrequencyGraph(dphiData, metadata);
+
+            audioControls.style.display = 'block';
+            updateButtonState(false);
+            countdownDiv.style.display = 'none';
+
+            // Free the memory allocated in C
+            freeFT8Result(resultPtr);
+        });
+
+        function createFrequencyGraph(dphiData, metadata) {
+            const graphDiv = document.getElementById('frequency-graph');
+            graphDiv.innerHTML = '';
+
+            const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+            const width = graphDiv.clientWidth - margin.left - margin.right;
+            const height = 200 - margin.top - margin.bottom;
+
+            const svg = d3.select(graphDiv).append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const x = d3.scaleLinear()
+                .domain([0, dphiData.length])
+                .range([0, width]);
+
+            const y = d3.scaleLinear()
+                .domain([metadata.base_frequency - 5, metadata.base_frequency + 55])
+                .range([height, 0]);
+
+            const line = d3.line()
+                .x((d, i) => x(i))
+                .y(d => y(d / (2 * Math.PI) * metadata.sample_rate));
+
+            svg.append("path")
+                .datum(dphiData)
+                .attr("fill", "none")
+                .attr("stroke", "steelblue")
+                .attr("stroke-width", 1.5)
+                .attr("d", line);
+
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x));
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Frequency (Hz)");
+        }
     }
 
     if (typeof Module !== 'undefined') {
