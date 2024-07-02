@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VK3PGO FT8 Encoder/Decoder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #ffffff;
@@ -34,7 +35,7 @@
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Jost', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', 'Apple Color Emoji';
             line-height: 1.6;
             color: var(--text-color);
             background-color: var(--bg-color);
@@ -82,6 +83,11 @@
             padding: 10px 20px;
             cursor: pointer;
             transition: background-color 0.3s ease;
+        }
+
+        #visualization-caption {
+            color: gray;
+            font-size: 0.7em;
         }
 
         button:hover {
@@ -148,6 +154,21 @@
             background-color: #ddd;
         }
 
+        #audio-visualization {
+            margin-top: 20px;
+        }
+        #waveform-canvas {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #ccc;
+        }
+        #visualization-controls {
+            margin-top: 10px;
+        }
+        #time-display {
+            margin-left: 10px;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -186,7 +207,14 @@
         </div>
 
         <div id="piano-roll" style="margin-top: 20px;"></div>
-        <div id="frequency-graph" style="margin-top: 20px;"></div>
+        <div id="audio-visualization">
+            <canvas id="waveform-canvas"></canvas>
+            <div id="visualization-caption"></div>
+            <div id="visualization-controls">
+                <button id="toggle-visualization">Change Vizualization</button>
+                <span id="time-display">0.00 / 0.00</span>
+            </div>
+        </div>
         <div id="output"></div>
 
         <div id="example-messages">
@@ -208,6 +236,17 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>
 <script>
+    let audioData, dphiData, dphiSamples, currentTime = 0;
+    let audioContext = null;
+    let audioBuffer = null;
+    let audioSource = null;
+    let countdownInterval = null;
+    let audioSamples;
+    let metadata;
+    let channelData;
+    let baseFreq = 500;
+    let sampleRate = 12000;
+
     const exampleMessages = [
         "CQ K1ABC FN42",
         "K1ABC W9XYZ -15",
@@ -218,7 +257,7 @@
 
     function initializeUI() {
         const encodeButton = document.getElementById('encode-button');
-        const decodeButton = document.getElementById('decode-button');
+        const decodeButton = document.getElementById('decode-button'); // not used (yet)
         const messageInput = document.getElementById('message-input');
         const baseFreqInput = document.getElementById('base-freq-input');
         const audioInput = document.getElementById('audio-input');
@@ -233,6 +272,11 @@
         const countdownDiv = document.getElementById('countdown');
         const themeToggle = document.getElementById('theme-toggle');
         const exampleMessagesDiv = document.getElementById('example-messages');
+
+        const waveformCanvas = document.getElementById('waveform-canvas');
+        waveformCanvas.width = waveformCanvas.clientWidth;
+        waveformCanvas.height = 200;
+        let waveformCtx = waveformCanvas.getContext('2d');
 
         const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number', 'number']);
         const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
@@ -256,11 +300,6 @@
             return result;
         };
 
-        let audioContext = null;
-        let audioBuffer = null;
-        let audioSource = null;
-        let countdownInterval = null;
-
         function normalizeMessage(message) {
             return message.trim().toUpperCase().replace(/\s+/g, ' ');
         }
@@ -270,26 +309,38 @@
             return input.replace(/[-\s]/g, '');
         }
 
+        function normalizeBinary(input) {
+            // 0 and 1 only
+            return input.replace(/[-\s]/g, '');
+        }
+
         function normalizePackedData(input) {
-            return input.replace(/[-\s]/g, '').toUpperCase();
+            //return input.replace(/[-\s]/g, '').toUpperCase();
+            return input.replace(/[-\s]/g, '').toLowerCase();
         }
 
         function detectInputType(input) {
             input = input.trim();
 
-            if (/^[0-7]{79}$/.test(input)) {
+            if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
                 return 'symbols';
             }
-            // Check if input is hex string (packed data)
-            if (/^([0-9A-Fa-f]{2}[-\s]?){10}$/.test(input)) {
+            // Check if input is hex string (packed data); pairs of hex must be together.
+            if (/^\s*([0-9A-Fa-f]{2}[-\s]?){10}\s*$/.test(input)) {
                 return 'packed';
             }
+
+            if (/^[0-1]{77}$/.test(normalizeBinary(input))) {
+                return '77 bits'; // Source-encoded message, 77 bits
+            }
+
             // Otherwise, assume it's a message
             return 'message';
         }
 
 
         function updateOutput(result, inputType, originalInput) {
+            
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
 
@@ -305,9 +356,12 @@
             if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {
                 decodedSpan.style.color = 'red';
             }
-
             output.appendChild(decodedSpan);
-            output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text)}<br>`;
+
+            //const packedHexStr = `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+            const messageInfo = FT8MessageTypeInfo(packedData);
+            output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
+            output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text, messageInfo)}<br>`;
 
             createPianoRoll(Array.from(symbols));
         }
@@ -355,7 +409,7 @@
 
         function highlightCurrentSymbol(currentTime) {
             const symbolDuration = audioBuffer.duration / 79; // 79 symbols in FT8
-            const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+            currentSymbolIndex = Math.floor(currentTime / symbolDuration);
             
             const pianoRollDiv = document.getElementById('piano-roll');
             const symbols = pianoRollDiv.children;
@@ -382,28 +436,6 @@
         function getHighlightColor(symbol) {
             const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
             return colors[symbol];
-        }
-
-        function playAudio() {
-            if (audioBuffer && !audioSource) {
-                audioContext.resume().then(() => {
-                    audioSource = audioContext.createBufferSource();
-                    audioSource.buffer = audioBuffer;
-                    audioSource.connect(audioContext.destination);
-                    audioSource.start();
-                    audioSource.onended = resetAudioState;
-                    updateButtonState(true);
-
-                    const startTime = audioContext.currentTime;
-                    pianoRollInterval = setInterval(() => {
-                        const currentTime = audioContext.currentTime - startTime;
-                        highlightCurrentSymbol(currentTime);
-                        if (currentTime >= audioBuffer.duration) {
-                            clearInterval(pianoRollInterval);
-                        }
-                    }, 50); // Update every 50ms
-                });
-            }
         }
 
         function stopAudio() {
@@ -461,6 +493,7 @@
                     const startTime = audioContext.currentTime;
                     pianoRollInterval = setInterval(() => {
                         const currentTime = audioContext.currentTime - startTime;
+                        drawWaveform(currentTime);
                         highlightCurrentSymbol(currentTime);
                         if (currentTime >= audioBuffer.duration) {
                             clearInterval(pianoRollInterval);
@@ -509,6 +542,7 @@
         playAudioButton.addEventListener('click', playAudio);
         playAudioTimedButton.addEventListener('click', playAudioTimed);
         stopAudioButton.addEventListener('click', stopAudio);
+        downloadAudioButton.addEventListener('click', downloadAudio);
 
         function downloadAudio() {
             if (audioBuffer) {
@@ -583,23 +617,69 @@
             }
         }
 
-        downloadAudioButton.addEventListener('click', downloadAudio);
+        function findMinAndMax(numbers) {
+            let min = Infinity;
+            let max = -Infinity;
+            
+            for (const num of numbers) {
+                if (num < min) min = num;
+                if (num > max) max = num;
+            }
+            
+            return { min, max };
+        }
+
+        function scaleToRange(numbers, newMin, newMax) {
+            const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
+            const scale = (newMax - newMin) / (originalMax - originalMin);
+            
+            return numbers.map(num => (num - originalMin) * scale + newMin);
+        }
+
+        function binaryToHex(binaryStr) {
+            // Pad the binary string to ensure its length is a multiple of 4
+            let paddedBinaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
+            
+            let hexString = '';
+            for (let i = 0; i < paddedBinaryStr.length; i += 4) {
+                let fourBits = paddedBinaryStr.slice(i, i + 4);
+                let hexDigit = parseInt(fourBits, 2).toString(16);
+                hexString += hexDigit;
+            }
+            
+            return hexString;
+        }
 
         encodeButton.addEventListener('click', () => {
             let input = messageInput.value;
             const inputType = detectInputType(input);
-            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+
+            baseFreq = parseFloat(baseFreqInput.value) || 1000;
+            sampleRate = parseInt(sampleRateSelect.value);
                     
             let resultPtr;
             if (inputType === 'symbols') {
                 input = normalizeSymbols(input);
-                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number'], [input, baseFreq]);
+                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else if (inputType === 'packed') {
+                if (typeof Module['_processPackedHexStr'] !== 'function') {
+                    console.error('processPackedHexStr function not found in Module');
+                    return;
+                }
+
                 input = normalizePackedData(input);
-                resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number'], [input, baseFreq]);
+                console.log(input, baseFreq, sampleRate)
+                console.log(typeof input, typeof baseFreq, typeof sampleRate)
+                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+
+            } else if (inputType === '77 bits') {
+                binaryStr = normalizeBinary(input);
+                input = binaryToHex(binaryStr);
+                console.log(binaryStr, input, baseFreq, sampleRate)
+                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else {
                 input = normalizeMessage(input);
-                resultPtr = encodeFT8(input, baseFreq);
+                resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             }
 
             if (resultPtr === 0) {
@@ -614,113 +694,49 @@
                 symbol_count: Module.getValue(resultPtr + 12, 'i32'),
                 audio: Module.getValue(resultPtr + 16, '*'),
                 audio_samples: Module.getValue(resultPtr + 20, 'i32'),
-                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'))
+                dphi: Module.getValue(resultPtr + 24, '*'),
+                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
+                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
+                metadata_length: Module.getValue(resultPtr + 36, 'i32')
             };
 
             updateOutput(result, inputType, input);
 
-            // Create audio buffer
-            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
-            const channelData = audioBuffer.getChannelData(0);
-            channelData.set(audioSamples);
+            if (result.audio_samples > 0) {
+                audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+                dphiSamples = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+                audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
+                channelData = audioBuffer.getChannelData(0);
+                channelData.set(audioSamples);
+                
+                let range = findMinAndMax(dphiSamples);
+                dphiSamples = scaleToRange(dphiSamples, 190, 10) // fit in 0 to 200 (and flip?)
 
-            audioControls.style.display = 'block';
-            updateButtonState(false);
-            countdownDiv.style.display = 'none';
+                try {
+                    metadata = JSON.parse(result.metadata);
+                    console.log(metadata);
 
-            // Recreate the audio context to ensure it's in a clean state
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-            // Free the memory allocated in C
-            freeFT8Result(resultPtr);
-        });
-
-        playAudioButton.addEventListener('click', playAudio);
-        downloadAudioButton.addEventListener('click', downloadAudio);
-
-        decodeButton.addEventListener('click', () => {
-            const input = messageInput.value;
-            const inputType = detectInputType(input);
-            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-
-            if (inputType === 'symbols') {
-                output.textContent = `Input type: ${inputType}\n`;
-                const symbols = input.split(/\s+/).map(Number);
-                const symbolsPtr = Module._malloc(symbols.length);
-                Module.HEAPU8.set(symbols, symbolsPtr);
-                const decodedText = decodeFT8Symbols(symbolsPtr, symbols.length);
-                Module._free(symbolsPtr);
-
-                output.textContent += `Decoded: ${decodedText}\n`;
-                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
-
-                createPianoRoll(symbols);
-            } else if (inputType === 'packed') {
-                output.textContent = `Input type: ${inputType}\n`;
-                const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
-                const packedPtr = Module._malloc(packed.length);
-                Module.HEAPU8.set(packed, packedPtr);
-                const decodedText = decodeFT8PackedData(packedPtr, packed.length);
-                Module._free(packedPtr);
-
-                output.textContent += `Decoded: ${decodedText}\n`;
-                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
-
-                // Generate symbols from packed data for piano roll
-                const symbolsPtr = Module._malloc(79);
-                Module.ccall('ft8_encode', null, ['number', 'number'], [packedPtr, symbolsPtr]);
-                const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, 79);
-                createPianoRoll(Array.from(symbols));
-                Module._free(symbolsPtr);
-            } else {
-                output.textContent = '';
-                const resultPtr = encodeFT8(input, baseFreq);
-
-                if (resultPtr === 0) {
-                    output.textContent += "Error: Invalid message format\n";
-                    return;
+                } catch (e) {
+                    console.error("Error parsing metadata:", e);
+                    metadata = {};
                 }
 
-                const result = {
-                    packed_data: Module.getValue(resultPtr, '*'),
-                    packed_size: Module.getValue(resultPtr + 4, 'i32'),
-                    symbols: Module.getValue(resultPtr + 8, '*'),
-                    symbol_count: Module.getValue(resultPtr + 12, 'i32'),
-                    audio: Module.getValue(resultPtr + 16, '*'),
-                    audio_samples: Module.getValue(resultPtr + 20, 'i32')
-                };
-
-                const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
-                const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-
-                output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
-                output.textContent += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
-
-                //???
-                const decodedText = Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'));
-                output.textContent += `Decoded: ${decodedText}\n`;
-                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
-                createPianoRoll(Array.from(symbols));
-
-                // Create audio buffer
-                const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
-                const channelData = audioBuffer.getChannelData(0);
-                channelData.set(audioSamples);
+                createWaveformVisualization(audioSamples, dphiSamples, metadata);
 
                 audioControls.style.display = 'block';
                 updateButtonState(false);
                 countdownDiv.style.display = 'none';
-
-                freeFT8Result(resultPtr);
+            } else {
+                console.error("No audio data generated");
+                output.textContent += "\nError: No audio data generated";
+                audioControls.style.display = 'none';
             }
-        });
 
-        playAudioButton.addEventListener('click', playAudio);
-        downloadAudioButton.addEventListener('click', downloadAudio);
+            // Free the memory allocated in C
+            Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
+        });
 
         exampleMessages.forEach(message => {
             const button = document.createElement('button');
@@ -732,12 +748,69 @@
             exampleMessagesDiv.appendChild(button);
         });
 
-        function explainFT8Message(message) {
+
+        function FT8MessageTypeInfo(packedData) { 
+            //packedData : Uint8Array(10)
+            if (!packedData || packedData.length == 1 ) {
+                return { messageType: "None", type: "-" };
+            } else if ( packedData.length < 10) { 
+                return { messageType: "Unknown", type: "-" };
+            }
+
+            const bytes = packedData;
+
+            const i3 = (bytes[9] >> 3) & 0x07;
+
+            //const firstByte = parseInt(packedData.substr(0, 2), 16);
+            //const i3 = (firstByte >> 5) & 0x07; // Extract bits 5-7 (3 bits)
+            
+            if (i3 <= 5) {
+                //const n3 = (firstByte >> 2) & 0x07; // Extract bits 2-4 (3 bits) for i3=0
+                const n3 = (bytes[8] >> 5) & 0x07;
+                
+                switch (i3) {
+                    case 0:
+                        switch (n3) {
+                            case 0: return { type: "0.0", messageType: "Free text message" };
+                            case 1: return { type: "0.1", messageType: "DXpedition mode" };
+                            case 2: return { type: "0.2", messageType: "EU VHF contest" };
+                            case 3: return { type: "0.3", messageType: "ARRL Field Day" };
+                            case 4: return { type: "0.4", messageType: "ARRL Field Day" };
+                            case 5: return { type: "0.5", messageType: "Telemetry" };
+                            case 6: return { type: "0.6", messageType: "Contesting" };
+                            case 7: return { type: "0.7", messageType: "Reserved for future use" };
+                        }
+                        break;
+                    case 1: return { type: "1", messageType: "Standard message" };
+                    case 2: return { type: "2", messageType: "Standard message with compound callsign" };
+                    case 3: return { type: "3", messageType: "ARRL RTTY Roundup exchange" };
+                    case 4: return { type: "4", messageType: "Non-standard callsigns" };
+                    case 5: return { type: "5", messageType: "EU VHF contest with 6-digit grid locator" };
+                    case 6: return { type: "6", messageType: "Unknown / Reserved" };
+                    case 7: return { type: "7", messageType: "Unknown / Reserved" };
+                    default: return { type: `${i3}`, messageType: "Unknown" };
+                }
+            }
+
+            return { messageType: "Unknown", type: "-" };
+        }
+
+        function explainFT8Message(message, TypeInfo) {
+            if (message === "Decoding failed") {
+                return '';
+            }
+
+            let typeExplanation = "";
+
             const parts = message.trim().split(/\s+/);
             let explanation = '';
 
-            function isValidCallsign(call) {
+            function isSimpleCallsign(call) {
                 return /^[A-Z0-9]{1,6}$/.test(call);
+            }
+            function isValidCallsign(call) {
+                // at least one letter, one number, 3 to 15 characters, optional slash but not as first or last character
+                return /[A-Z]/.test(call) && /[0-9]/.test(call) && /^[A-Z0-9][A-Z0-9\/]{1,13}[A-Z0-9]$/.test(call);
             }
 
             function isGridLocator(grid) {
@@ -792,7 +865,7 @@
                 explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
             }
 
-            return explanation;
+            return typeExplanation + explanation;
         }
 
         themeToggle.addEventListener('click', () => {
@@ -814,112 +887,154 @@
         });
         baseFreqInput.parentNode.insertBefore(sampleRateSelect, baseFreqInput.nextSibling);
 
-        encodeButton.addEventListener('click', () => {
-            const input = normalizeMessage(messageInput.value);
-            const inputType = detectInputType(input);
-            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            const sampleRate = parseInt(sampleRateSelect.value);
-            
-            let resultPtr;
-            if (inputType === 'symbols') {
-                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-            } else if (inputType === 'packed') {
-                //todo
-            } else {
-                resultPtr = encodeFT8(input, baseFreq, sampleRate);
-            }
+        function createWaveformVisualization(audioSamples, dphiSamples, metadata) {
+            audioData = audioSamples;
+            dphiData = dphiSamples;
+            sampleRate = metadata?.sample_rate ?? 12000;
 
-            if (resultPtr === 0) {
-                output.textContent = "Error: Invalid input";
+            // Set canvas size
+            waveformCanvas.width = waveformCanvas.clientWidth;
+            waveformCanvas.height = 200;
+
+            // Initial draw
+            drawWaveform();
+        }
+
+        function handleResize() {
+            if (waveformCanvas) {
+                waveformCanvas.width = waveformCanvas.clientWidth;
+                drawWaveform();
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+
+        const showModes = [ 
+            {name: "Off", "mode": "off", "zoom": 1}, 
+            {name: "Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
+            {name: "Frequency Deviation (zoom)", "mode": "dphi", "zoom": 16}, 
+            {name: "Waveform", "mode": "wave", "zoom": 256},
+            {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
+        ];
+        let showMode = 0;
+        const toggleVisualizationButton = document.getElementById('toggle-visualization');
+        const VisualizationCaption = document.getElementById('visualization-caption');
+        function toggleVisualization() { // todo: rename cycleVisualization
+            showMode = (showMode + 1) % showModes.length;
+            //showDphi = !showDphi;
+            VisualizationCaption.innerHTML = showModes[showMode]['name'];
+            drawWaveform();
+        }
+        toggleVisualization(); // set name on button (and turn on viz)
+
+        toggleVisualizationButton.addEventListener('click', toggleVisualization);
+
+        function drawWaveform(currentTime = 0) {
+            const mode = showModes[showMode];
+            const showDphi = (mode['mode'] === 'dphi');
+            const off = (mode['mode'] === 'off');
+
+            if (!waveformCanvas) return;
+
+            const width = waveformCanvas.width;
+            const height = waveformCanvas.height;
+            const middle = height / 2;
+            waveformCtx.clearRect(0, 0, width, height);
+
+            if (off) return;
+
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
+
+            const zoomLevel = mode['zoom'];
+
+            const data = showDphi ? dphiData : audioData;
+            if (!data || data.length === 0) {
+                console.error(`No ${showDphi ? 'dphiData' : 'audioData'} to draw`);
                 return;
             }
 
-            const result = {
-                packed_data: Module.getValue(resultPtr, '*'),
-                packed_size: Module.getValue(resultPtr + 4, 'i32'),
-                symbols: Module.getValue(resultPtr + 8, '*'),
-                symbol_count: Module.getValue(resultPtr + 12, 'i32'),
-                audio: Module.getValue(resultPtr + 16, '*'),
-                audio_samples: Module.getValue(resultPtr + 20, 'i32'),
-                dphi: Module.getValue(resultPtr + 24, '*'),
-                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
-                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
-                metadata_length: Module.getValue(resultPtr + 36, 'i32')
-            };
+            const totalDuration = data.length / sampleRate;
+            const visibleDuration = totalDuration / zoomLevel;
+            const samplesPerPixel = (sampleRate * visibleDuration) / width;
 
-            updateOutput(result, inputType, input);
+            let startTime = currentTime - visibleDuration / 2;
+            let endTime = currentTime + visibleDuration / 2;
 
-            // Create audio buffer
-            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-            audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
-            const channelData = audioBuffer.getChannelData(0);
-            channelData.set(audioSamples);
+            // Adjust start and end times to prevent showing blank areas
+            if (startTime < 0) {
+                startTime = 0;
+                endTime = visibleDuration;
+            } else if (endTime > totalDuration) {
+                endTime = totalDuration;
+                startTime = endTime - visibleDuration;
+            }
 
-            // Create dphi data
-            const dphiData = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
+            let startSample = Math.floor(startTime * sampleRate);
+            let endSample = Math.floor(endTime * sampleRate);
 
-            // Parse metadata
-            const metadata = JSON.parse(result.metadata);
+            // Implement trigger-like behavior for high zoom levels
+            if (!showDphi && zoomLevel > 2000) {
+                const triggerWindowSamples = Math.floor(sampleRate * 0.01); // 0.001 = 1ms window (todo: consider actual data)
+                //const triggerThreshold = 0.1;
+                
+                for (let i = startSample; i < startSample + triggerWindowSamples; i++) {
+                    if (i + 1 < data.length) {
+                        if (data[i] <= 0 && data[i + 1] > 0) {
+                            // || (Math.abs(data[i]) < triggerThreshold && Math.abs(data[i + 1]) >= triggerThreshold)) {
 
-            // Create frequency graph
-            createFrequencyGraph(dphiData, metadata);
+                            //todo: should probably do some of these calcs in samples instead of time, but matching earlier calcs
+                            let newStartSample = i;
+                            let newEndTime = (i / sampleRate) + visibleDuration;
+                            if (endTime > totalDuration) {
+                                break; // trigger is too late, ignore
+                                //endTime = totalDuration;
+                                //startTime = endTime - (visibleDuration / sampleRate);
+                                //startSample = Math.floor(startTime * sampleRate); 
+                            }
 
-            audioControls.style.display = 'block';
-            updateButtonState(false);
-            countdownDiv.style.display = 'none';
+                            startSample = newStartSample;
+                            endSample = Math.floor(newEndTime * sampleRate);
+                            break;
+                        }
+                    }
+                }
+            }
 
-            // Free the memory allocated in C
-            freeFT8Result(resultPtr);
-        });
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
 
-        function createFrequencyGraph(dphiData, metadata) {
-            const graphDiv = document.getElementById('frequency-graph');
-            graphDiv.innerHTML = '';
+            let lastX = -1;
+            for (let sample = startSample; sample <= endSample; sample++) {
+                if (sample >= 0 && sample < data.length) {
+                    const x = Math.floor((sample - startSample) / samplesPerPixel);
+                    if (x !== lastX) {
+                        let y;
+                        if (showDphi) {
+                            y = data[sample]; // pre-scaled
+                        } else {
+                            y = middle + (data[sample] * middle * 0.9);
+                        }
+                        waveformCtx.lineTo(x, y);
+                        lastX = x;
+                    }
+                }
+            }
 
-            const margin = { top: 20, right: 20, bottom: 30, left: 50 };
-            const width = graphDiv.clientWidth - margin.left - margin.right;
-            const height = 200 - margin.top - margin.bottom;
+            waveformCtx.strokeStyle = showDphi ? 'green' : 'steelblue';
+            waveformCtx.stroke();
 
-            const svg = d3.select(graphDiv).append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
+            // Draw playback position line
+            const playbackX = ((currentTime - startTime) / visibleDuration) * width;
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(playbackX, 0);
+            waveformCtx.lineTo(playbackX, height);
+            waveformCtx.strokeStyle = 'red';
+            waveformCtx.stroke();
 
-            const x = d3.scaleLinear()
-                .domain([0, dphiData.length])
-                .range([0, width]);
-
-            const y = d3.scaleLinear()
-                .domain([metadata.base_frequency - 5, metadata.base_frequency + 55])
-                .range([height, 0]);
-
-            const line = d3.line()
-                .x((d, i) => x(i))
-                .y(d => y(d / (2 * Math.PI) * metadata.sample_rate));
-
-            svg.append("path")
-                .datum(dphiData)
-                .attr("fill", "none")
-                .attr("stroke", "steelblue")
-                .attr("stroke-width", 1.5)
-                .attr("d", line);
-
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x));
-
-            svg.append("g")
-                .call(d3.axisLeft(y));
-
-            svg.append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left)
-                .attr("x", 0 - (height / 2))
-                .attr("dy", "1em")
-                .style("text-anchor", "middle")
-                .text("Frequency (Hz)");
+            // Update time display
+            const timeDisplay = document.getElementById('time-display');
+            timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
         }
     }
 

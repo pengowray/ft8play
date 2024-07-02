@@ -2018,13 +2018,13 @@ var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 var _processSymbols = Module["_processSymbols"] = createExportWrapper("processSymbols");
 
 /** @type {function(...*):?} */
-var _decodeFT8Symbols = Module["_decodeFT8Symbols"] = createExportWrapper("decodeFT8Symbols");
+var _processPackedHexStr = Module["_processPackedHexStr"] = createExportWrapper("processPackedHexStr");
 
 /** @type {function(...*):?} */
 var _free = Module["_free"] = createExportWrapper("free");
 
 /** @type {function(...*):?} */
-var _processPackedData = Module["_processPackedData"] = createExportWrapper("processPackedData");
+var _decodeFT8Symbols = Module["_decodeFT8Symbols"] = createExportWrapper("decodeFT8Symbols");
 
 /** @type {function(...*):?} */
 var _decodeFT8PackedData = Module["_decodeFT8PackedData"] = createExportWrapper("decodeFT8PackedData");
