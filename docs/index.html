@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VK3PGO FT8 Encoder/Decoder</title>
+    <title>VK3PGO FT8 Player</title>
     <link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -194,7 +194,7 @@
         <h1>FT8 Encoder/Decoder</h1> 
 -->
 
-        <h2>VK3PGO FT8 Encoder / Audio Generator</h2>
+        <h2>VK3PGO FT8 Player</h2>
         <input type="text" id="message-input" placeholder="Enter message to encode">
         <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500">
         <button id="encode-button">Encode</button>
@@ -222,7 +222,8 @@
         </div>
 
         <div>
-            Created by Pengo Wray (VK3PGO). Encoding library: <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
+            Created by Pengo Wray. View on <a href="https://github.com/pengowray/ft8play">github</a>. <br>
+            Encoding library: FT8_lib. All processing is done on your device.
         </div>
 
         <div style="display: none;">
@@ -235,6 +236,7 @@
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>
+<script src="ft8_extra.js"></script>
 <script>
     let audioData, dphiData, dphiSamples, currentTime = 0;
     let audioContext = null;
@@ -252,7 +254,8 @@
         "K1ABC W9XYZ -15",
         "W9XYZ K1ABC R-17",
         "K1ABC W9XYZ RRR",
-        "W9XYZ K1ABC 73"
+        "W9XYZ K1ABC 73",
+        "<TNX BOB 73 GL>"
     ];
 
     function initializeUI() {
@@ -304,6 +307,9 @@
             return message.trim().toUpperCase().replace(/\s+/g, ' ');
         }
 
+        function normalizeBracketedFreeText(input) {
+            return input.trim().replace(/^<|>$/g, '');
+        }
         function normalizeSymbols(input) {
             // numbers only
             return input.replace(/[-\s]/g, '');
@@ -319,8 +325,17 @@
             return input.replace(/[-\s]/g, '').toLowerCase();
         }
 
+        function detectFreeTextBrackets(str) {
+            const trimmed = str.trim();
+            return (trimmed.startsWith('<') && trimmed.endsWith('>'));
+        }
+
         function detectInputType(input) {
             input = input.trim();
+
+            if (detectFreeTextBrackets(input)) {
+                return 'free text';
+            }
 
             if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
                 return 'symbols';
@@ -334,7 +349,7 @@
                 return '77 bits'; // Source-encoded message, 77 bits
             }
 
-            // Otherwise, assume it's a message
+            // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
             return 'message';
         }
 
@@ -349,7 +364,7 @@
                 output.innerHTML += `Input type: ${inputType}<br>`;
             }
             output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
-            output.innerHTML += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
+            output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
 
             const decodedSpan = document.createElement('span');
             decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
@@ -358,7 +373,6 @@
             }
             output.appendChild(decodedSpan);
 
-            //const packedHexStr = `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;
             const messageInfo = FT8MessageTypeInfo(packedData);
             output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
             output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text, messageInfo)}<br>`;
@@ -636,29 +650,27 @@
             return numbers.map(num => (num - originalMin) * scale + newMin);
         }
 
-        function binaryToHex(binaryStr) {
-            // Pad the binary string to ensure its length is a multiple of 4
-            let paddedBinaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
-            
-            let hexString = '';
-            for (let i = 0; i < paddedBinaryStr.length; i += 4) {
-                let fourBits = paddedBinaryStr.slice(i, i + 4);
-                let hexDigit = parseInt(fourBits, 2).toString(16);
-                hexString += hexDigit;
+        messageInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                encodeButton.click();
             }
-            
-            return hexString;
-        }
+        });
 
         encodeButton.addEventListener('click', () => {
             let input = messageInput.value;
-            const inputType = detectInputType(input);
+            let inputType = detectInputType(input);
 
             baseFreq = parseFloat(baseFreqInput.value) || 1000;
             sampleRate = parseInt(sampleRateSelect.value);
                     
             let resultPtr;
-            if (inputType === 'symbols') {
+            if (inputType === 'free text') {
+                input = normalizeBracketedFreeText(input);
+                const packedData = encodeFT8FreeText(input);
+                const hexStr = packedToHexStr(packedData);
+                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
+
+            } else if (inputType === 'symbols') {
                 input = normalizeSymbols(input);
                 resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else if (inputType === 'packed') {
@@ -666,20 +678,32 @@
                     console.error('processPackedHexStr function not found in Module');
                     return;
                 }
-
                 input = normalizePackedData(input);
-                console.log(input, baseFreq, sampleRate)
-                console.log(typeof input, typeof baseFreq, typeof sampleRate)
                 resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
 
             } else if (inputType === '77 bits') {
                 binaryStr = normalizeBinary(input);
                 input = binaryToHex(binaryStr);
-                console.log(binaryStr, input, baseFreq, sampleRate)
                 resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else {
                 input = normalizeMessage(input);
                 resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+            }
+
+            if (inputType !== 'free text' && (!resultPtr || resultPtr === 0)) {
+                // attempt free text fallback
+                let textInput = input.trim();
+                if (textInput.length <= 13 && textInput.length > 0) {
+                    try {
+                        const packedData = encodeFT8FreeText(textInput);
+                        const hexStr = packedToHexStr(packedData);
+                        console.log("packedData", packedData);
+                        resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
+                        inputType = 'free text';
+                    } catch (e) {
+                         console.log("not free text", textInput, e)
+                    }
+                }
             }
 
             if (resultPtr === 0) {
@@ -760,42 +784,35 @@
             const bytes = packedData;
 
             const i3 = (bytes[9] >> 3) & 0x07;
-
-            //const firstByte = parseInt(packedData.substr(0, 2), 16);
-            //const i3 = (firstByte >> 5) & 0x07; // Extract bits 5-7 (3 bits)
-            
-            if (i3 <= 5) {
-                //const n3 = (firstByte >> 2) & 0x07; // Extract bits 2-4 (3 bits) for i3=0
-                const n3 = (bytes[8] >> 5) & 0x07;
-                
-                switch (i3) {
-                    case 0:
-                        switch (n3) {
-                            case 0: return { type: "0.0", messageType: "Free text message" };
-                            case 1: return { type: "0.1", messageType: "DXpedition mode" };
-                            case 2: return { type: "0.2", messageType: "EU VHF contest" };
-                            case 3: return { type: "0.3", messageType: "ARRL Field Day" };
-                            case 4: return { type: "0.4", messageType: "ARRL Field Day" };
-                            case 5: return { type: "0.5", messageType: "Telemetry" };
-                            case 6: return { type: "0.6", messageType: "Contesting" };
-                            case 7: return { type: "0.7", messageType: "Reserved for future use" };
-                        }
-                        break;
-                    case 1: return { type: "1", messageType: "Standard message" };
-                    case 2: return { type: "2", messageType: "Standard message with compound callsign" };
-                    case 3: return { type: "3", messageType: "ARRL RTTY Roundup exchange" };
-                    case 4: return { type: "4", messageType: "Non-standard callsigns" };
-                    case 5: return { type: "5", messageType: "EU VHF contest with 6-digit grid locator" };
-                    case 6: return { type: "6", messageType: "Unknown / Reserved" };
-                    case 7: return { type: "7", messageType: "Unknown / Reserved" };
-                    default: return { type: `${i3}`, messageType: "Unknown" };
-                }
+   
+            switch (i3) {
+                case 0:
+                    const n3 = ((bytes[9] >> 6) & 0x03) | ((bytes[8] << 2) & 0x04); // bit[72] to bit[74] of end-padded 77-bit payload
+                    switch (n3) {
+                        case 0: return { type: "0.0", messageType: "Free text message" };
+                        case 1: return { type: "0.1", messageType: "DXpedition mode" };
+                        case 2: return { type: "0.2", messageType: "Unknown / Reserved" }; // EU VHF Contest ?
+                        case 3: return { type: "0.3", messageType: "Field Day" };
+                        case 4: return { type: "0.4", messageType: "Field Day" };
+                        case 5: return { type: "0.5", messageType: "Telemetry" };
+                        case 6: return { type: "0.6", messageType: "Unknown / Reserved" }; // Contesting ?
+                        case 7: return { type: "0.7", messageType: "Unknown / Reserved" }; // Reserved for future use ?
+                    }
+                    break;
+                case 1: return { type: "1", messageType: "Standard message" };
+                case 2: return { type: "2", messageType: "EU VHF" };
+                case 3: return { type: "3", messageType: "ARRL RTTY Roundup" }; // ARRL RTTY Roundup exchange ?
+                case 4: return { type: "4", messageType: "Non-standard callsign" };
+                case 5: return { type: "5", messageType: "Unknown / Reserved" }; // EU VHF contest with 6-digit grid locator ?
+                case 6: return { type: "6", messageType: "Unknown / Reserved" };
+                case 7: return { type: "7", messageType: "Unknown / Reserved" };
+                default: return { type: `${i3}`, messageType: "Unknown" };
             }
 
             return { messageType: "Unknown", type: "-" };
         }
 
-        function explainFT8Message(message, TypeInfo) {
+        function explainFT8Message(message, typeInfo) {
             if (message === "Decoding failed") {
                 return '';
             }
@@ -857,12 +874,13 @@
                 } else {
                     explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is non-standard.`;
                 }
-            } else if (message.startsWith('<') && message.endsWith('>')) {
-                explanation = `This is a free-text message: "${message}". Free-text messages in FT8 are limited to 13 characters.`;
+            } else if (typeInfo.type == 0) { // || message.startsWith('<') && message.endsWith('>')) {
+                explanation = `This is a free-text message: "${message}".`; // Free-text messages in FT8 are limited to 13 characters.
             } else if (/^[0-9A-F]{12}$/.test(message)) {
                 explanation = `This appears to be a telemetry message containing 12 hexadecimal digits: ${message}. The specific meaning depends on the implementation.`;
             } else {
-                explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
+                explanation = '';
+                //explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
             }
 
             return typeExplanation + explanation;
