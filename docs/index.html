@@ -638,7 +638,7 @@
 
         function binaryToHex(binaryStr) {
             // Pad the binary string to ensure its length is a multiple of 4
-            let paddedBinaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
+            let paddedBinaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
             
             let hexString = '';
             for (let i = 0; i < paddedBinaryStr.length; i += 4) {
