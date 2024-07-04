@@ -33,7 +33,8 @@ Bugs
 
 Todo:
 - [ ] decode FT8 audio
-- [ ] fully support all ft8 message types, and break down all parts of the message
+- [ ] fully support encoding and decoding of all ft8 message types, and break down all parts of the message
+- [ ] have UI suggest alternative encoding methods when available
 - [ ] optimizations
 - [ ] FFT visualization
 - [ ] rework the UI
