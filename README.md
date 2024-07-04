@@ -21,7 +21,8 @@ What things are in the UI:
 Message input formats:
 - A standard FT8 message such as CQ, signal report, acknowledgement. Example: `CQ AA9GO QF22`. If FT8_lib fails to encode the text as a standard message, then ft8play attempts to encode it as a free text payload. FT8_lib does not yet support certain FT8 message types such as DXpedition mode and contests. Click the example messages at the bottom of the page to test different messages.
 - `<FREE TEXT>`. The message you write between the `<` and `>` will be uppercased and truncated to 13 characters. Valid characters are ` 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?`
-
+- Telemetry data. Examples: `123456789ABCDEF012` `T:DEADCAFE`. Exactly 18 hexadecimal digits (first digit must be 0 to 7), or `T:` followed by 1 to 18 hex digits. 71-bits.
+ 
 Payload/symbol input formats: (for debugging or advanced uses)
 - FT8 payload as packed hex: Exactly 10 hexadecimal digits containing your 77-bit payload (zero-padded on the end, not the start). e.g. `5f a5 ec 39 30 6f aa c3 d6 00` Input may contain spaces or dashes between the bytes. This format is found in the output of gen_ft8, a command line tool which comes as source code in FT8_lib
 - FT8 payload as packed binary string, exactly 77 digits: Example: `00001100001010010011101110000000010011011110111100011010111010100001100110001` This is a format displayed by the WSJT-X utility ft8code.exe. It calls it "Source-encoded message, 77 bits". Input can contain spaces.
