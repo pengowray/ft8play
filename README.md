@@ -25,7 +25,7 @@ Message input formats:
 Payload/symbol input formats: (for debugging or advanced uses)
 - FT8 payload as packed hex: Exactly 10 hexadecimal digits containing your 77-bit payload (zero-padded on the end, not the start). e.g. `5f a5 ec 39 30 6f aa c3 d6 00` Input may contain spaces or dashes between the bytes. This format is found in the output of gen_ft8, a command line tool which comes as source code in FT8_lib
 - FT8 payload as packed binary string, exactly 77 digits: Example: `00001100001010010011101110000000010011011110111100011010111010100001100110001` This is a format displayed by the WSJT-X utility ft8code.exe. It calls it "Source-encoded message, 77 bits". Input can contain spaces.
-- Symbols: Exactly 79 digits, zero to seven, representing the eight tones of FT8). For example: `3140652154634130077314147171333010263140652631713260022224072711662335223140652` Input may optionally contain spaces. This format is used within the output of both ft8code (wsjt-x) and gen_ft8 (ft8_lib). Perhaps someone is talented enough to edit the numbers into a melodic tune. Fun fact: G#3 (210.27 Hz) and A3 (222.75 Hz) are close to 12.5 Hz apart, the same separation as tones in FT8.
+- Symbols: Exactly 79 digits, zero to seven, representing the eight tones of FT8. For example: `3140652154634130077314147171333010263140652631713260022224072711662335223140652` Input may optionally contain spaces. This format is used within the output of both ft8code (wsjt-x) and gen_ft8 (ft8_lib). Perhaps someone is talented enough to edit the numbers into a melodic tune. Fun fact: G#3 (210.27 Hz) and A3 (222.75 Hz) are close to 12.5 Hz apart, the same separation as tones in FT8.
 
 Bugs
 - It's a bit flaky and will break if you hit the "generate" button while audio is still playing.
@@ -44,3 +44,6 @@ Software libraries used:
 
 Privacy:
 - All processing is done on your local machine or device. Your input is not sent anywhere except by you, as audio.
+
+Where can I use VK3PGO's FT8 Player? 
+- [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/)
