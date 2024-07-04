@@ -66,6 +66,50 @@ function encodeFT8FreeText(message) {
   return output;
 }
 
+// Encode 71-bit telemetry data
+function encodeFT8Telemetry(telemetryHex) {
+  // Ensure the input is a valid 18-character hex string
+  if (!/^[0-9A-Fa-f]{1,18}$/.test(telemetryHex)) {
+    return { "error": "Error: Telemetry data must be a 1 to 18 character hex string" };
+  }
+
+  // Convert hex to binary string
+  let binaryString = hexToBinary(telemetryHex).replace(/^0*/g, '');
+
+  // Add message type 0.5 (000101 in binary)
+  binaryString = binaryString.padStart(71, '0') + '101000' // slice(-71)
+
+  // Check if the binary string starts with 1 (exceeding 71 bits)
+  if (binaryString[0] === '1' || binaryString.length > 77) {
+    return { "error": "Error: First digit of 18-character hex string telemetry data must fall in the range 0 to 7." };
+  }
+
+  //console.log('telemetry', binaryString);
+  // Convert binary string back to hex string
+  return { "result": binaryToHex(binaryString) };
+}
+
+// Decode 71-bit telemetry data (untested; done by ft8_lib already)
+function decodeFT8Telemetry(payload) {
+  if (!(payload instanceof Uint8Array) || payload.length !== 10) {
+    throw new Error("Invalid payload: must be a Uint8Array of length 10");
+  }
+
+  // Extract the binary string
+  let binaryString = '';
+  for (let i = 0; i < 10; i++) {
+    binaryString += payload[i].toString(2).padStart(8, '0');
+  }
+
+  // Remove the last 6 bits (message type)
+  binaryString = binaryString.slice(0, -6);
+
+  // Convert binary to hex
+  const telemetryHex = binaryToHex(binaryString);
+
+  return telemetryHex;
+}
+
 
 function packedToHexStr(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;
@@ -87,5 +131,20 @@ function binaryToHex(binaryStr) {
     }
     
     return hexString;
+}
+
+
+// Helper function to convert hex string to binary string
+function hexToBinary(hex) {
+  return hex.split('').map(char => 
+    parseInt(char, 16).toString(2).padStart(4, '0')
+  ).join('');
+}
+
+// Helper function to convert binary string to hex string
+function binaryToHex_V2(binary) {
+  return binary.match(/.{1,8}/g).map(byte => 
+    parseInt(byte, 2).toString(16).padStart(2, '0')
+  ).join('');
 }
 

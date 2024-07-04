@@ -222,8 +222,13 @@
         </div>
 
         <div>
-            Created by Pengo Wray. View on <a href="https://github.com/pengowray/ft8play">github</a>. <br>
+            Created by Pengo Wray. <br>
             Encoding library: FT8_lib. All processing is done on your device.
+        <br>
+        <br>
+        <a href="https://github.com/pengowray/ft8play">
+          <img src="https://img.shields.io/badge/View%20on-GitHub-brightgreen" alt="View on GitHub">
+        </a>
         </div>
 
         <div style="display: none;">
@@ -325,6 +330,20 @@
             return input.replace(/[-\s]/g, '').toLowerCase();
         }
 
+        function normalizeTelemetry(str) {
+            //exactly 18 hex digits, or start with T:
+            //note: first digit must be 0-8 if 18 digits. (not checked here)
+            let trimmed = str.trim();
+            trimmed = trimmed.toUpperCase().replace(/^[Tt]:\s*/g, '');
+            return trimmed;
+        }
+        function detectTelemetry(str) {
+            //exactly 18 hex digits, or start with T:
+            //note: first digit must be 0-8 if 18 digits. (not checked here)
+            const trimmed = str.trim();
+            return (/^[0-9A-Fa-f]{18}$/.test(trimmed)) || (/[Tt]:\s*[0-9A-Fa-f]{1,18}$/.test(trimmed))
+        }
+
         function detectFreeTextBrackets(str) {
             const trimmed = str.trim();
             return (trimmed.startsWith('<') && trimmed.endsWith('>'));
@@ -343,6 +362,10 @@
             // Check if input is hex string (packed data); pairs of hex must be together.
             if (/^\s*([0-9A-Fa-f]{2}[-\s]?){10}\s*$/.test(input)) {
                 return 'packed';
+            }
+
+            if (detectTelemetry(input)) {
+                return 'telemetry';
             }
 
             if (/^[0-1]{77}$/.test(normalizeBinary(input))) {
@@ -657,109 +680,124 @@
         });
 
         encodeButton.addEventListener('click', () => {
-            let input = messageInput.value;
-            let inputType = detectInputType(input);
+            try {
+                let input = messageInput.value;
+                let inputType = detectInputType(input);
 
-            baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            sampleRate = parseInt(sampleRateSelect.value);
-                    
-            let resultPtr;
-            if (inputType === 'free text') {
-                input = normalizeBracketedFreeText(input);
-                const packedData = encodeFT8FreeText(input);
-                const hexStr = packedToHexStr(packedData);
-                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
+                baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                sampleRate = parseInt(sampleRateSelect.value);
+                        
+                let resultPtr;
+                if (inputType === 'free text') {
+                    input = normalizeBracketedFreeText(input);
+                    const packedData = encodeFT8FreeText(input);
+                    const hexStr = packedToHexStr(packedData);
+                    resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
 
-            } else if (inputType === 'symbols') {
-                input = normalizeSymbols(input);
-                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-            } else if (inputType === 'packed') {
-                if (typeof Module['_processPackedHexStr'] !== 'function') {
-                    console.error('processPackedHexStr function not found in Module');
-                    return;
+                } else if (inputType === 'symbols') {
+                    input = normalizeSymbols(input);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === 'packed') {
+                    if (typeof Module['_processPackedHexStr'] !== 'function') {
+                        console.error('processPackedHexStr function not found in Module');
+                        return;
+                    }
+                    input = normalizePackedData(input);
+                    resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+
+                } else if (inputType == 'telemetry') {
+                    input = normalizeTelemetry(input);
+                    let result = encodeFT8Telemetry(input);
+                    if (result.error) {
+                        output.innerHTML = result.error;
+                        return;
+                    } else {
+                        resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [result.result, baseFreq, sampleRate]);
+                    }
+
+                } else if (inputType === '77 bits') {
+                    binaryStr = normalizeBinary(input);
+                    input = binaryToHex(binaryStr);
+                    resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else {
+                    input = normalizeMessage(input);
+                    resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
                 }
-                input = normalizePackedData(input);
-                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
 
-            } else if (inputType === '77 bits') {
-                binaryStr = normalizeBinary(input);
-                input = binaryToHex(binaryStr);
-                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-            } else {
-                input = normalizeMessage(input);
-                resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-            }
-
-            if (inputType !== 'free text' && (!resultPtr || resultPtr === 0)) {
-                // attempt free text fallback
-                let textInput = input.trim();
-                if (textInput.length <= 13 && textInput.length > 0) {
-                    try {
-                        const packedData = encodeFT8FreeText(textInput);
-                        const hexStr = packedToHexStr(packedData);
-                        console.log("packedData", packedData);
-                        resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
-                        inputType = 'free text';
-                    } catch (e) {
-                         console.log("not free text", textInput, e)
+                if (inputType !== 'free text' && (!resultPtr || resultPtr === 0)) {
+                    // attempt free text fallback
+                    let textInput = input.trim();
+                    if (textInput.length <= 13 && textInput.length > 0) {
+                        try {
+                            const packedData = encodeFT8FreeText(textInput);
+                            const hexStr = packedToHexStr(packedData);
+                            console.log("packedData", packedData);
+                            resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
+                            inputType = 'free text';
+                        } catch (e) {
+                             console.log("not free text", textInput, e)
+                        }
                     }
                 }
-            }
 
-            if (resultPtr === 0) {
-                output.textContent = "Error: Invalid input";
-                return;
-            }
-
-            const result = {
-                packed_data: Module.getValue(resultPtr, '*'),
-                packed_size: Module.getValue(resultPtr + 4, 'i32'),
-                symbols: Module.getValue(resultPtr + 8, '*'),
-                symbol_count: Module.getValue(resultPtr + 12, 'i32'),
-                audio: Module.getValue(resultPtr + 16, '*'),
-                audio_samples: Module.getValue(resultPtr + 20, 'i32'),
-                dphi: Module.getValue(resultPtr + 24, '*'),
-                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
-                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
-                metadata_length: Module.getValue(resultPtr + 36, 'i32')
-            };
-
-            updateOutput(result, inputType, input);
-
-            if (result.audio_samples > 0) {
-                audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-                dphiSamples = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
-                
-                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-                audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
-                channelData = audioBuffer.getChannelData(0);
-                channelData.set(audioSamples);
-                
-                let range = findMinAndMax(dphiSamples);
-                dphiSamples = scaleToRange(dphiSamples, 190, 10) // fit in 0 to 200 (and flip?)
-
-                try {
-                    metadata = JSON.parse(result.metadata);
-                    console.log(metadata);
-
-                } catch (e) {
-                    console.error("Error parsing metadata:", e);
-                    metadata = {};
+                if (resultPtr === 0) {
+                    output.innerHTML = "Error: Invalid input";
+                    return;
                 }
 
-                createWaveformVisualization(audioSamples, dphiSamples, metadata);
+                const result = {
+                    packed_data: Module.getValue(resultPtr, '*'),
+                    packed_size: Module.getValue(resultPtr + 4, 'i32'),
+                    symbols: Module.getValue(resultPtr + 8, '*'),
+                    symbol_count: Module.getValue(resultPtr + 12, 'i32'),
+                    audio: Module.getValue(resultPtr + 16, '*'),
+                    audio_samples: Module.getValue(resultPtr + 20, 'i32'),
+                    dphi: Module.getValue(resultPtr + 24, '*'),
+                    decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
+                    metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
+                    metadata_length: Module.getValue(resultPtr + 36, 'i32')
+                };
 
-                audioControls.style.display = 'block';
-                updateButtonState(false);
-                countdownDiv.style.display = 'none';
-            } else {
-                console.error("No audio data generated");
-                output.textContent += "\nError: No audio data generated";
-                audioControls.style.display = 'none';
+                updateOutput(result, inputType, input);
+
+
+                if (result.audio_samples > 0) {
+                    audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+                    dphiSamples = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
+                    
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+                    audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
+                    channelData = audioBuffer.getChannelData(0);
+                    channelData.set(audioSamples);
+                    
+                    let range = findMinAndMax(dphiSamples);
+                    dphiSamples = scaleToRange(dphiSamples, 190, 10) // fit in 0 to 200 (and flip?)
+
+                    try {
+                        metadata = JSON.parse(result.metadata);
+                        console.log(metadata);
+
+                    } catch (e) {
+                        console.error("Error parsing metadata:", e);
+                        metadata = {};
+                    }
+
+                    createWaveformVisualization(audioSamples, dphiSamples, metadata);
+
+                    audioControls.style.display = 'block';
+                    updateButtonState(false);
+                    countdownDiv.style.display = 'none';
+                } else {
+                    console.error("No audio data generated");
+                    output.textContent += "\nError: No audio data generated";
+                    audioControls.style.display = 'none';
+                }
+            } catch (error) {
+                    output.innerHTML = "Error: " + error.message;
+            } finally {
+                // Free the memory allocated in C
+                Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
             }
-
-            // Free the memory allocated in C
-            Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
         });
 
         exampleMessages.forEach(message => {
@@ -821,6 +859,7 @@
 
             const parts = message.trim().split(/\s+/);
             let explanation = '';
+            console.log(parts);
 
             function isSimpleCallsign(call) {
                 return /^[A-Z0-9]{1,6}$/.test(call);
@@ -842,23 +881,26 @@
                 if (isValidCallsign(parts[1])) {
                     explanation = `This is a general call (CQ) message. Station ${parts[1]} is calling CQ, looking for any station to respond.`;
                 } else {
-                    explanation = `This appears to be an incomplete or non-standard CQ message.`;
+                    explanation = `This is an unrecognized CQ message.`;
                 }
             } else if (parts.length === 3 && parts[0] === 'CQ') {
                 if (isValidCallsign(parts[1]) && isGridLocator(parts[2])) {
-                    explanation = `This is a general call (CQ) message with location. Station ${parts[1]} is calling CQ from grid square ${parts[2]}.`;
+                    explanation = `This is a general call (CQ) message with location. Station ${parts[1]} is calling CQ from grid square ${parts[2]}, looking for any station to respond.`;
                 } else if (/^[A-Z]{2}$/.test(parts[1]) && isValidCallsign(parts[2])) {
-                    explanation = `This is a directed CQ message. Station ${parts[2]} is calling CQ, specifically looking for stations in the ${parts[1]} region.`;
+                    explanation = `This is a directed CQ message. Station ${parts[2]} is calling CQ, specifically looking for stations in the ${parts[1]} region to respond.`;
                 } else {
-                    explanation = `This appears to be a non-standard CQ message format.`;
+                    explanation = `This is an unrecognized CQ message.`;
                 }
             } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
                 if (isReport(parts[2])) {
                     explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
+                    if (parts[2] === '73') { 
+                        explanation += ' 73 is also shorthand for <i>best regards</i>.'
+                    }
                 } else if (parts[2] === 'RRR') {
                     explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
                 } else if (parts[2] === 'RR73') {
-                    explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying goodbye to station ${parts[1]}.`;
+                    explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying <i>best regards</i> to station ${parts[1]}.`;
                 } else if (parts[2] === '73') {
                     explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
                 } else if (isGridLocator(parts[2])) {
@@ -866,18 +908,20 @@
                 } else if (parts[2].startsWith('R')) {
                     explanation = `Station ${parts[0]} is acknowledging receipt of a message from ${parts[1]} and sending a signal report of ${parts[2].slice(1)} dB.`;
                 } else {
-                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is non-standard.`;
+                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is not recognized.`;
                 }
             } else if (parts.length === 4 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
                 if (parts[2] === 'R' && isReport(parts[3])) {
                     explanation = `This is a signal report acknowledgment. Station ${parts[0]} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${parts[1]}.`;
                 } else {
-                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is non-standard.`;
+                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is not recognized.`;
                 }
-            } else if (typeInfo.type == 0) { // || message.startsWith('<') && message.endsWith('>')) {
+            } else if (typeInfo.type === '0.0') { // || message.startsWith('<') && message.endsWith('>')) {
                 explanation = `This is a free-text message: "${message}".`; // Free-text messages in FT8 are limited to 13 characters.
-            } else if (/^[0-9A-F]{12}$/.test(message)) {
-                explanation = `This appears to be a telemetry message containing 12 hexadecimal digits: ${message}. The specific meaning depends on the implementation.`;
+            } else if (typeInfo.type === '0.5') {
+                explanation = `This is a telemetry message containing hexadecimal digits: ${message.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
+            } else if (/^[0-9A-F]{4,18}$/.test(message)) { 
+                explanation = `This message is made up of hexadecimal digits, but it is not a telemetry message type.`;
             } else {
                 explanation = '';
                 //explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
