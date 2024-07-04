@@ -9,7 +9,7 @@ FT8 is a digital chat mode designed by Joe Taylor, the first human to ever notic
 To transmit FT8 long distance you'll need to become a ham radio licensee, which you can do by tricking the right people into believing you understand how photons work. You'll also need a radio. Or you can just play FT8 on your speakers and hope someone out there hears your message. It can be picked up through a lot of noise. Or see if you can decode it yourself with an FT8 app like WSJT-X.
 
 ![Screenshot_20240704_072016_Firefox](https://github.com/pengowray/ft8play/assets/800133/1796e807-ed9d-46cf-9dc5-476e4973a823)
-**Splitscreen Test: Decoding FT8 Player's audio on an Android phone with split screen.** The FT8 audio is played on the phone's speaker by the [FT8 Player web page](https://pengowray.github.io/ft8play/). The audio is picked up by the FT8CN app using the phone's microphone.
+**Splitscreen Test: Decoding FT8 Player's audio on an Android phone.** The FT8 audio is played on the phone's speaker by the [FT8 Player web page](https://pengowray.github.io/ft8play/). The audio is picked up by the FT8CN app using the device's built-in microphone and decoded.
 
 What things are in the UI:
 - The number in a text box is the base frequency (default 500 Hz). FT8 audio output will range from the base frequency to 50 Hz above it. 1000 Hz is often preferred for certain setups, but 500 Hz is the default because it made for more pleasant listening while building this app.
