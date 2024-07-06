@@ -67,6 +67,16 @@
             color: var(--link-visited-color);
         }
 
+        .btn {
+          height: 40px;
+          padding: 0 15px;
+          border-radius: 4px;
+          font-size: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
         input[type="text"], input[type="file"] {
             width: 100%;
             padding: 10px;
@@ -91,6 +101,113 @@
         }
 
         button:hover {
+            opacity: 0.9;
+        }
+
+        .input-group {
+          display: flex;
+          align-items: stretch;
+        }
+
+        #message-input {
+          flex-grow: 1;
+          height: 40px;
+          padding: 0 10px;
+          border-radius: 4px 0 0 4px;
+        }
+
+        #encode-button {
+          border-radius: 0 4px 4px 0;
+        }
+/*
+        .input-group input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+*/
+
+        #theme-toggle {
+          position: fixed;
+          top: 10px;
+          right: 10px;
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          opacity: 0.7;
+        }
+
+        #theme-toggle:hover {
+          opacity: 1;
+        }
+
+        #toggle-settings {
+          background: none;
+          border: none;
+          color: var(--text-color);
+          opacity: 0.7;
+          font-size: 14px;
+          padding: 5px 0;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
+        #audio-controls {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 15px;
+        }
+
+        @media (max-width: 600px) {
+          #audio-controls {
+            flex-direction: column;
+          }
+          
+          #audio-controls .btn {
+            width: 100%;
+          }
+        }
+        .settings-toggle {
+            margin-bottom: 10px;
+        }
+
+        #audio-settings {
+            background-color: var(--input-bg);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        #audio-settings.hidden {
+            display: none;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .setting-group label {
+            min-width: 150px;
+            margin-right: 10px;
+        }
+
+        #base-freq-input, #sample-rate-select {
+            flex-grow: 1;
+        }
+
+        #toggle-settings {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #toggle-settings:hover {
             opacity: 0.9;
         }
 
@@ -188,38 +305,53 @@
     </style>
 </head>
 <body class="dark-mode">
-    <div class="container">
-        <button id="theme-toggle">Toggle Dark Mode</button>
-<!-- 
-        <h1>FT8 Encoder/Decoder</h1> 
--->
+<div class="container">
+    <button id="theme-toggle" aria-label="Toggle Dark Mode">🌓</button>
 
-        <h2>VK3PGO FT8 Player</h2>
-        <input type="text" id="message-input" placeholder="Enter message to encode">
-        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500">
-        <button id="encode-button">Encode</button>
-        <div id="audio-controls" style="display:none;">
-            <button id="play-audio">Play Audio</button>
-            <button id="play-audio-timed">Play at Next 15s Slot</button>
-            <button id="stop-audio" disabled>Stop Audio</button>
-            <button id="download-audio">Download Audio</button>
-            <div id="countdown"></div>
-        </div>
+    <h2>VK3PGO FT8 Player</h2>
+    
+    <div class="input-group">
+      <input type="text" id="message-input" placeholder="Enter message to encode">
+      <button id="encode-button" class="btn">Encode</button>
+    </div>
 
-        <div id="piano-roll" style="margin-top: 20px;"></div>
-        <div id="audio-visualization">
-            <canvas id="waveform-canvas"></canvas>
-            <div id="visualization-caption"></div>
-            <div id="visualization-controls">
-                <button id="toggle-visualization">Change Vizualization</button>
-                <span id="time-display">0.00 / 0.00</span>
-            </div>
-        </div>
-        <div id="output"></div>
+    <div class="settings-toggle">
+        <button id="toggle-settings">Audio Settings ▼</button>
+    </div>
 
-        <div id="example-messages">
-            <h3>Example Messages:</h3>
+    <div id="audio-settings" class="hidden">
+        <div class="setting-group">
+            <label for="base-freq-input">Base Frequency (Hz):</label>
+            <input type="text" id="base-freq-input" placeholder="e.g., 500 or A4" value="500">
         </div>
+        <div class="setting-group">
+            <label for="sample-rate-select">Sample Rate:</label>
+            <select id="sample-rate-select"></select>
+        </div>
+    </div>
+
+    <div id="audio-controls">
+      <button id="play-audio" class="btn">Play Audio</button>
+      <button id="play-audio-timed" class="btn">Play Next 15s Slot</button>
+      <button id="stop-audio" class="btn" disabled>Stop Audio</button>
+      <button id="download-audio" class="btn">Download Audio</button>
+      <div id="countdown"></div>
+    </div>
+
+    <div id="piano-roll" style="margin-top: 20px;"></div>
+    <div id="audio-visualization">
+        <canvas id="waveform-canvas"></canvas>
+        <div id="visualization-caption"></div>
+        <div id="visualization-controls">
+            <button id="toggle-visualization">Change Visualization</button>
+            <span id="time-display">0.00 / 0.00</span>
+        </div>
+    </div>
+    <div id="output"></div>
+
+    <div id="example-messages">
+        <h3>Example Messages:</h3>
+    </div>
 
         <div>
             Created by Pengo Wray. <br>
@@ -272,6 +404,11 @@
         const encodeOutput = document.getElementById('output');
         const output = document.getElementById('output');
         //const decodeOutput = document.getElementById('decode-output');
+
+        const toggleSettingsButton = document.getElementById('toggle-settings');
+        const audioSettings = document.getElementById('audio-settings');
+        const sampleRateSelect = document.getElementById('sample-rate-select');
+
         const audioControls = document.getElementById('audio-controls');
         const playAudioButton = document.getElementById('play-audio');
         const playAudioTimedButton = document.getElementById('play-audio-timed');
@@ -315,6 +452,7 @@
         function normalizeBracketedFreeText(input) {
             return input.trim().replace(/^<|>$/g, '');
         }
+
         function normalizeSymbols(input) {
             // numbers only
             return input.replace(/[-\s]/g, '');
@@ -333,15 +471,24 @@
         function normalizeTelemetry(str) {
             //exactly 18 hex digits, or start with T:
             //note: first digit must be 0-8 if 18 digits. (not checked here)
+            
             let trimmed = str.trim();
-            trimmed = trimmed.toUpperCase().replace(/^[Tt]:\s*/g, '');
+            trimmed = trimmed.toUpperCase()
+                .replace(/^[Tt](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
+                .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
+                .replace(/[ \-\:]/g, '') // remove any space - :
+                .replace(/^[0]*/g, ''); // initial 0's hopefully
             return trimmed;
         }
+
         function detectTelemetry(str) {
             //exactly 18 hex digits, or start with T:
             //note: first digit must be 0-8 if 18 digits. (not checked here)
-            const trimmed = str.trim();
-            return (/^[0-9A-Fa-f]{18}$/.test(trimmed)) || (/[Tt]:\s*[0-9A-Fa-f]{1,18}$/.test(trimmed))
+            const trimmed = str.trim().toUpperCase();
+            return (/^([0-9A-Fa-f][\s\-\:]?){18}$/.test(trimmed)) 
+//                || (/^[Tt](ELEMETRY)?:\s0*([0-9A-Fa-f][\s\-\:]?){1,18}$/.test(trimmed))
+                  || (/^[Tt](ELEMETRY)?\s*:/.test(trimmed))
+                  || (/\#T(ELEMETRY)?$/.test(trimmed))
         }
 
         function detectFreeTextBrackets(str) {
@@ -368,27 +515,119 @@
                 return 'telemetry';
             }
 
-            if (/^[0-1]{77}$/.test(normalizeBinary(input))) {
-                return '77 bits'; // Source-encoded message, 77 bits
-            }
+            const normBinary = normalizeBinary(input);
+            if (/^[0-1]+$/.test(normBinary)) {
+                if (normBinary.length === 77) {
+                   return '77 bits'; // Source-encoded message, 77 bits
+                } else if (normBinary.length === 91) { // 77 + 14 bits
+                   return '77 bits + CRC';
+                } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
+                   return '77 bits + CRC + LDPC'
+                } else if (normBinary.length === 77 + 14 + 83 + 21) { // costas as binary
+                   return 'symbols (as binary)'
+                }
+            } 
 
             // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
             return 'message';
         }
 
+        const parseFreq = (note) => {
+            return parseNote(note) || parseFloat(note) || 500;
+        }
+
+        const parseNote = (note) => {
+          const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+          const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+          
+          // Validate input
+          if (typeof note !== 'string') return NaN;
+          
+          // Convert flat notation to sharp notation if necessary
+          let normalizedNote = note.replace(/([A-G])b(\d?)$/, (_, noteLetter, octave) => 
+            (flatToSharp[noteLetter + 'b'] || noteLetter + 'b') + octave
+          );
+          
+          const octave = parseInt(normalizedNote.slice(-1)) || 4;
+          const noteWithoutOctave = normalizedNote.replace(/\d+$/, '');
+          const keyNumber = notes.indexOf(noteWithoutOctave);
+          
+          if (keyNumber === -1) return NaN;
+          
+          const a4 = 440;
+          return a4 * Math.pow(2, (octave - 4) + (keyNumber - 9) / 12);
+        };
+
+        function detectNoteNotation(input) {
+          // Regular expression to match note notation
+          const notePattern = /^([A-G](#|b)?)(\d)?$/;
+          const match = input.match(notePattern);
+          
+          if (match) {
+            const [, note, accidental, octave] = match;
+            return {
+              isValid: true,
+              note: note,
+              accidental: accidental || null,
+              octave: octave ? parseInt(octave) : null
+            };
+          } else {
+            return { isValid: false };
+          }
+        }
 
         function updateOutput(result, inputType, originalInput) {
             
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+            const symbolsText = Array.from(symbols).join('');
+            console.log('symbolsText', symbolsText);
+
+            printMessageDetails(symbolsText);
+            const syncCheckResult = checkSync(symbolsText);
+            const crcCheckResult = checkCRC(symbolsText);
+            const parityCheckResult = checkParity(symbolsText); // LDPC
 
             output.innerHTML = '';
             if (inputType !== 'message') {
                 output.innerHTML += `Input type: ${inputType}<br>`;
             }
-            output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
-            output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
+            output.innerHTML += `Symbols: ${symbolsText}<br>`;
 
+            // sync check (costas)
+            const syncSpan = document.createElement('span');
+            syncSpan.textContent = `Sync check: ${syncCheckResult.result}`;
+            if (syncCheckResult.result !== 'OK' ) {
+                syncSpan.style.color = 'red';
+                syncSpan.textContent += '. Unexpected symbol position(s): ' + syncCheckResult.errors.join(', ');
+                console.log('Sync', syncCheckResult);
+            }
+            output.appendChild(syncSpan);
+            output.innerHTML += "<br>";
+
+            // CRC (14-bits)
+            const crcSpan = document.createElement('span');
+            crcSpan.textContent = `CRC check: ${crcCheckResult.result}`;
+            if (crcCheckResult.result !== 'OK' ) {
+                crcSpan.style.color = 'red';
+                console.log('CRC', crcCheckResult);
+            }
+            output.appendChild(crcSpan);
+            output.innerHTML += "<br>";
+
+            // Parity (LDPC)
+            const paritySpan = document.createElement('span');
+            paritySpan.textContent = `Parity check: ${parityCheckResult.result}`;
+            if (parityCheckResult.result !== 'OK' ) {
+                paritySpan.style.color = 'red';
+                console.log('Parity', parityCheckResult);
+
+            }
+            output.appendChild(paritySpan);
+
+            output.innerHTML += `<br>Packed: ${packedToHexStrSp(packedData)}<br>`;
+
+            // re-decoded
             const decodedSpan = document.createElement('span');
             decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
             if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {
@@ -589,7 +828,7 @@
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                const baseFreq = parseFreq(baseFreqInput.value) || 1000;
                 const message = messageInput.value.replace(/\s+/g, '_');
                 a.download = `FT8-${baseFreq}Hz_${message}.wav`;
                 document.body.appendChild(a);
@@ -680,14 +919,14 @@
         });
 
         encodeButton.addEventListener('click', () => {
+            let resultPtr;
             try {
                 let input = messageInput.value;
                 let inputType = detectInputType(input);
 
-                baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                baseFreq = parseFreq(baseFreqInput.value);
                 sampleRate = parseInt(sampleRateSelect.value);
-                        
-                let resultPtr;
+
                 if (inputType === 'free text') {
                     input = normalizeBracketedFreeText(input);
                     const packedData = encodeFT8FreeText(input);
@@ -719,6 +958,19 @@
                     binaryStr = normalizeBinary(input);
                     input = binaryToHex(binaryStr);
                     resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === '77 bits + CRC') {
+                    binaryStr = normalizeBinary(input);
+                    input = binary91ToSymbols(binaryStr);
+                    console.log("input91: ", input);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === '77 bits + CRC + LDPC') {
+                    binaryStr = normalizeBinary(input);
+                    input = binary174ToSymbols(binaryStr);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === 'symbols (as binary)') {
+                    binaryStr = normalizeBinary(input);
+                    input = binary195ToSymbols(binaryStr);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
                 } else {
                     input = normalizeMessage(input);
                     resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
@@ -793,10 +1045,13 @@
                     audioControls.style.display = 'none';
                 }
             } catch (error) {
-                    output.innerHTML = "Error: " + error.message;
+                output.innerHTML = "Error: " + error.message;
+                throw (error);
             } finally {
                 // Free the memory allocated in C
-                Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
+                if (resultPtr && resultPtr !== 0) {
+                    Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
+                }
             }
         });
 
@@ -938,16 +1193,22 @@
             }
         });
 
-        const sampleRateSelect = document.createElement('select');
-        sampleRateSelect.id = 'sample-rate-select';
-        [8000, 11025, 12000, 16000, 22050, 24000, 44100, 48000].forEach(rate => {
+        toggleSettingsButton.addEventListener('click', () => {
+            audioSettings.classList.toggle('hidden');
+            toggleSettingsButton.textContent = audioSettings.classList.contains('hidden') 
+                ? 'Audio Settings ▼' 
+                : 'Audio Settings ▲';
+        });
+
+        // Populate sample rate dropdown
+        const sampleRates = [8000, 11025, 12000, 16000, 22050, 24000, 44100, 48000];
+        sampleRates.forEach(rate => {
             const option = document.createElement('option');
             option.value = rate;
             option.textContent = `${rate} Hz`;
             if (rate === 12000) option.selected = true;
             sampleRateSelect.appendChild(option);
         });
-        baseFreqInput.parentNode.insertBefore(sampleRateSelect, baseFreqInput.nextSibling);
 
         function createWaveformVisualization(audioSamples, dphiSamples, metadata) {
             audioData = audioSamples;
