@@ -1,26 +1,33 @@
 # FT8 Player by VK3PGO
 
-[FT8 Player](https://pengowray.github.io/ft8play/) (ft8play) is a tool to generate and visualize FT8 audio. It runs in a web page.
+**[FT8 Player](https://pengowray.github.io/ft8play/)** (`ft8play`) is a tool to generate and visualize FT8 audio. It runs in a web page.
 
-How it works: Enter a short message, press encode, see it encoded, play the FT8 audio on your speaker or into your radio trasceiver if you like.
+How it works: Enter a short message, press encode, see it encoded, play the FT8 audio on your speaker or into your radio transceiver if you like.
 
-FT8 is a digital chat mode designed by Joe Taylor, the first human to ever notice a binary pulsar. The mode is popular with amateur radio enthusiasts who use it to fill the airwaves across the world with the sound of R2-D2 gargling.
+FT8 is a digital chat mode designed by Joe Taylor, the first human to ever notice a binary pulsar. The mode is popular with amateur radio enthusiasts who use it to fill the airwaves across the world with something that sounds like R2-D2 gargling.
 
-To transmit FT8 long distance you'll need to become a ham radio licensee, which you can do by tricking the right people into believing you understand how photons work. You'll also need a radio. Or you can just play FT8 on your speakers and hope someone out there hears your message. It can be picked up through a lot of noise. Or see if you can decode it yourself with an FT8 app like WSJT-X.
+To transmit FT8 long distance you'll need to become a ham radio licensee, which you can do by tricking the right people into believing you understand how photons really work. You'll also need a radio. Or you can just play FT8 on your speakers and hope someone out there hears your message. It can be picked up through a lot of noise. See if you can decode it with an FT8 app like WSJT-X or FT8CN.
 
 ![Screenshot_20240704_072016_Firefox](https://github.com/pengowray/ft8play/assets/800133/1796e807-ed9d-46cf-9dc5-476e4973a823)
-**Splitscreen Test: Decoding FT8 Player's audio on an Android phone.** The FT8 audio is played on the phone's speaker by the [FT8 Player web page](https://pengowray.github.io/ft8play/). The audio is picked up by the FT8CN app using the device's built-in microphone and decoded.
+**Splitscreen Test: Decoding FT8 Player's audio on an Android phone.** The FT8 audio is played on the phone's speaker by the [FT8 Player web page](https://pengowray.github.io/ft8play/). The FT8CN app picks up the audio again using the device's built-in microphone and decodes it.
+
+Who's this for?
+- Me. I wanted to see if it could be made. One must trust one's obsessions.
+- Anyone interesting in learning about FT8
+- Amateur radio folk who want to better craft or understand FT8 messages.
+- Developers of FT8 software, who might appreciate the ability to quickly check the validity and content of codewords, symbols, hex or binary payloads, etc.
+- The future. Eventually it would be fun to make a fully functional FT8 QSO app which runs in the browser, with logging and and CAT control for various radios (via the web serial API), but that's some way away.
 
 What things are in the UI:
-- The number in a text box is the base frequency (default 500 Hz). FT8 audio output will range from the base frequency to 50 Hz above it. 1000 Hz is often preferred for certain setups, but 500 Hz is the default because it made for more pleasant listening while building this app.
-- The number in the drop down is the sample rate (the number of audio samples per second in your generated audio signal). 12000 Hz is the default. 44100 Hz is CD quality. If you set the base frequency to more than about half the sample rate, you'll get fun aliasing effects.
+- Base Frequency (default 500 Hz). FT8 audio output will range from the base frequency to about 50 Hz above it. 1000 Hz is sometimes used as the default base frequency for certain applications, but 500 Hz is the default because it made for more pleasant listening while developing this.
+- Sample Rate: the number of audio samples per second in your generated audio signal. 12000 Hz is the default. 44100 Hz is CD quality. If you set the base frequency to more than about half the sample rate, you'll get fun aliasing effects.
 - "Play at Next 15s Slot" is an awkwardly named button which waits until the next FT8 window begins before playing audio. It's based on your device's clock. Please drop a message or a pull request if you know javascript and have a way of getting a precise time from somewhere on the internet (ala [time.is](https://time.is/)), or if you have an idea for a more consise name for this button.
 - Stop Audio, stops the audio playing unless you've encoded another message while it was playing because I haven't fixed that bug yet.
-- "Decoded:" — this turns red if your encoded message text does not exactly match your input message. Currently for standard message types only.
+- "Decoded:" — Takes your encoded messages and decodes it again so you can check it's the same. This turns red if your encoded message text does not exactly match your input message. Currently for standard message types only. (In the [preview release](https://pengowray.github.io/ft8play/preview/) it's red for an error, orange if it doesn't match, and it now gives you a message with the error or warning.)
 
 Message input formats:
-- A standard FT8 message such as CQ, signal report, acknowledgement. Example: `CQ AA9GO QF22`. If FT8_lib fails to encode the text as a standard message, then ft8play attempts to encode it as a free text payload. FT8_lib does not yet support certain FT8 message types such as DXpedition mode and contests. Click the example messages at the bottom of the page to test different messages.
-- `<FREE TEXT>`. The message you write between the `<` and `>` will be uppercased and truncated to 13 characters. Valid characters are ` 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?`
+- A standard FT8 message such as CQ, signal report, acknowledgement. Example: `CQ AA9GO QF22`. If FT8_lib fails to encode the text as a standard message, then ft8play attempts to encode it as a free text payload. FT8_lib does not yet support certain FT8 message types such as DXpedition mode and contests. Click the example messages at the bottom of the page to test different messages. (Note: The preview release does not currently automatically fall back to free text so they need to be entered as below)
+- `<FREE TEXT>`. The message you write between the `<` and `>` will be uppercased and truncated to 13 characters. Valid characters are ` 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?`. You can send anything as free text in FT8.
 - Telemetry data. Examples: `123456789ABCDEF012` `T:DEADCAFE`. Exactly 18 hexadecimal digits (first digit must be 0 to 7), or `T:` followed by 1 to 18 hex digits. 71-bits.
  
 Payload/symbol input formats: (for debugging or advanced uses)
@@ -30,22 +37,27 @@ Payload/symbol input formats: (for debugging or advanced uses)
 
 Bugs
 - It's a bit flaky and will break if you hit the "generate" button while audio is still playing.
+- You have to hit generate again after adjusting any audio settings.
 
-Todo:
+To do:
 - [ ] decode FT8 audio
 - [ ] fully support encoding and decoding of all ft8 message types, and break down all parts of the message
-- [ ] have UI suggest alternative encoding methods when available
+- [ ] have the UI suggest alternative encoding methods when available
 - [ ] optimizations
 - [ ] FFT visualization
 - [ ] rework the UI
 - [ ] lots of other things, but it's largely working and has the basics, so I'm happy to leave it as is for now.
 
 Software libraries used:
- - [My fork of ft8_lib with emscripten (wasm) support added](https://github.com/pengowray/ft8_lib/tree/ft8_wasm)
+ - [ft8_lib which I've forked to add emscripten (wasm) support](https://github.com/pengowray/ft8_lib/tree/ft8_wasm)
  - [D3 javascript library](https://d3js.org/)
 
 Privacy:
-- All processing is done on your local machine or device. Your input is not sent anywhere except by you, as audio.
+- All processing is done on your local machine or device. Your input is not sent anywhere except by you.
+
+Licence notes:
+- If you fork this project, do not use my name or callsigns in the fork's name, or in any titles or headings without permission, but do link back to this project.
 
 Where can I use VK3PGO's FT8 Player? 
-- [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/)
+- [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/) — FT8 Player runs in your browser.
+- There's also [a newer preview version of FT8 Player](https://pengowray.github.io/ft8play/preview/). The preview version has been reworked but does not appear very different. Right now it has both bug fixes and additional bugs, so is a work in progress.
