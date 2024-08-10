@@ -2018,6 +2018,12 @@ var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 var _processSymbols = Module["_processSymbols"] = createExportWrapper("processSymbols");
 
 /** @type {function(...*):?} */
+var _calculate_num_samples = Module["_calculate_num_samples"] = createExportWrapper("calculate_num_samples");
+
+/** @type {function(...*):?} */
+var _synth_gfsk = Module["_synth_gfsk"] = createExportWrapper("synth_gfsk");
+
+/** @type {function(...*):?} */
 var _processPackedHexStr = Module["_processPackedHexStr"] = createExportWrapper("processPackedHexStr");
 
 /** @type {function(...*):?} */
@@ -2028,6 +2034,9 @@ var _decodeFT8Symbols = Module["_decodeFT8Symbols"] = createExportWrapper("decod
 
 /** @type {function(...*):?} */
 var _decodeFT8PackedData = Module["_decodeFT8PackedData"] = createExportWrapper("decodeFT8PackedData");
+
+/** @type {function(...*):?} */
+var _freeFT8DecodeResult = Module["_freeFT8DecodeResult"] = createExportWrapper("freeFT8DecodeResult");
 
 /** @type {function(...*):?} */
 var _encodeFT8 = Module["_encodeFT8"] = createExportWrapper("encodeFT8");
@@ -2042,7 +2051,25 @@ var _encodeFT8_packed = Module["_encodeFT8_packed"] = createExportWrapper("encod
 var _encodeFT8_audio = Module["_encodeFT8_audio"] = createExportWrapper("encodeFT8_audio");
 
 /** @type {function(...*):?} */
+var _encodeFT8Message = Module["_encodeFT8Message"] = createExportWrapper("encodeFT8Message");
+
+/** @type {function(...*):?} */
+var _freeFT8EncodeResult = Module["_freeFT8EncodeResult"] = createExportWrapper("freeFT8EncodeResult");
+
+/** @type {function(...*):?} */
+var _encodeFT8MessageToSymbols = Module["_encodeFT8MessageToSymbols"] = createExportWrapper("encodeFT8MessageToSymbols");
+
+/** @type {function(...*):?} */
+var _packedToSymbols = Module["_packedToSymbols"] = createExportWrapper("packedToSymbols");
+
+/** @type {function(...*):?} */
+var _symbolsToAudio = Module["_symbolsToAudio"] = createExportWrapper("symbolsToAudio");
+
+/** @type {function(...*):?} */
 var _decodeFT8 = Module["_decodeFT8"] = createExportWrapper("decodeFT8");
+
+/** @type {function(...*):?} */
+var _synth_gfsk_custom = Module["_synth_gfsk_custom"] = createExportWrapper("synth_gfsk_custom");
 
 /** @type {function(...*):?} */
 var ___errno_location = Module["___errno_location"] = createExportWrapper("__errno_location");
