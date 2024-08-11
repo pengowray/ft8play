@@ -19,10 +19,8 @@ class OutputComponent extends Component {
         return {
             inputText: message.inputText,
             inputType: message.inputType,
-            messageType: {
-                type: message.ft8MessageType,
-                info: getFT8MessageTypeName(message.ft8MessageType)
-            },
+            ft8MessageType: message.ft8MessageType,
+            messageTypeInfo: getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
             decodedText: message.reDecodedResult.decodedText,
@@ -68,7 +66,6 @@ class OutputComponent extends Component {
         const decoded = decodeResult.decodedText;
         const originalInput = this.message.inputText;
         const inputType = this.message.inputType;
-        
 
         const decodeTest2 = {
             name: 'input match',
@@ -81,16 +78,19 @@ class OutputComponent extends Component {
 
             if (normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
                 decodeTest2.resultInfo = "Decoded message does not appear to match input.";
-                decodeTest2.result = 'warning';
-                decodeTest2.resultText = 'might not match input';
+                decodeTest2.result = 'error';
+                decodeTest2.resultText = 'does not match input';
                 if (normalizeMessageAndHashes(originalInput).startsWith(normalizeMessageAndHashes(decoded))) {
                     //todo: only catches if both contain a hash; check if decoded has transformed text into hash
                     //decodeTest2.resultInfo = "Hashes appear different.";
                     decodeTest2.resultText = 'match but unable to check hash data';
+                    decodeTest2.result = 'warning';
 
                 } else if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message appears to be truncated.";
                     decodeTest2.resultText = 'input truncated';
+                    decodeTest2.result = 'error';  // warn for plain text, but error for other messages
+                    //decodeTest2.result = 'warning';
                 } 
             } else  {
                 decodeTest2.resultText = 'ok'
@@ -102,11 +102,12 @@ class OutputComponent extends Component {
 
             if (decoded.toUpperCase() !== normalizeBracketedFreeText(originalInput).toUpperCase()) {
                 decodeTest2.resultInfo = "Decoded message does not appear to match free text input.";
-                decodeTest2.result = 'warning';
-                decodeTest2.resultText = 'might not match input';
+                decodeTest2.resultText = 'does not match input';
+                decodeTest2.result = 'error';
                 if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message has been truncated to fit 13 character limit of free text.";
                     decodeTest2.resultText = 'input truncated';
+                    decodeTest2.result = 'warning';
                 }
             } else {
                 decodeTest2.resultText = 'ok'
@@ -210,15 +211,18 @@ class OutputComponent extends Component {
         const outputBox = document.createElement('div');
         outputBox.className = 'output-box';
         outputBox.innerHTML = `
-            <h2>${data.messageType.info} (${data.messageType.type})</h2>
+            <h2>${data.messageTypeInfo} (${data.ft8MessageType})</h2>
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
                 ${this.renderRowText('Input type', data.inputType)}
 
+                ${this.renderSubheading('Message Fields')}
+                ${this.renderRows(data.messageBits, data.ft8MessageType)}
+
                 ${this.renderSubheading('Encoding')}
 
                 ${this.renderChecks('Checks', data.checks)}
-                ${this.renderRowData('Message type', `(${data.messageType.type}) ${data.messageType.info}`)}
+                ${this.renderRowData('Message type', `(${data.ft8MessageType}) ${data.messageTypeInfo}`)}
                 ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Use 3140652.')}
                 ${this.renderRowData('Packed', data.packed)}
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
@@ -231,7 +235,7 @@ class OutputComponent extends Component {
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
                 ${this.renderRowData('Decoded text', data.decodedText, data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null)}
-                ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "See also the binary visualization chart for more of the message content.") : ''}
+                ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "Please check if individual message fields were were decoded.") : ''}
 
                 ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
@@ -269,16 +273,72 @@ class OutputComponent extends Component {
         `;
     }
 
+    renderRows(payloadBits, ft8MessageType) {
+        let rowContent = '';
+        if (annotationDefinitions[ft8MessageType]) {
+            annotationDefinitions[ft8MessageType].forEach(annotationDef => {
+                let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits);
+
+                const label = annotation.tag ?? annotation.label ?? annotation.shortLabel;
+                //TODO: move tag to own field
+                //if (annotation.tag != null && label != annotation.tag) label += ` (${annotation.tag})`;
+                const secondaryLabel = (annotation.tag != null) ? annotation.label ?? annotation.shortLabel : null;
+
+                const pos = annotation.bits.length === 1 ?
+                      `bit ${annotation.start + 1}`
+                    : `bits ${annotation.start + 1} to ${annotation.start + annotation.length} (length: ${annotation.length} bits)`;
+                
+                const text = annotation.value ?? annotation.long ?? annotation.short;
+                const note = `Raw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})\nPosition in payload: ${pos}`;
+        
+                //rowContent += this.renderRowData(label, text, note);
+                rowContent += this.renderRowDataField( {...annotation, value: text, label, secondaryLabel, comment: 'comment example'} );
+            });
+        } else {
+            console.warn(`No annotation definition for message type: ${ft8MessageType}`);
+        }
+        return rowContent;
+    }
+
     renderRowData(label, value, comment = null) {
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
-                <div class="output-value">${escapeHTML(value)}</div>
-                ${comment ? `<div class="output-comment">${escapeHTML(comment)}</div>` : ''}
+                <div class="output-value output-data">${escapeHTML(value)}</div>
+                ${comment ? `<div class="output-comment">${escapeHTML(comment).replace('\n','<br>')}</div>` : ''}
             </div>
         `;
     }
+    renderRowDataField(fieldData) {
+        const {
+            label,
+            secondaryLabel,
+            tag,
+            value,
+            desc,
+            subtype,
+            bits,
+            rawIntValue,
+            start,
+            length,
+            comment,
+            units
+        } = fieldData;
+    
+        const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
+    
+        return `
+            <div class="output-row">
+                <div class="output-label">${secondaryLabel} ${label ? `<span class="output-sublabel">${label}` : ''}</span></div>
+                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ subtype || desc ? `<div class="output-metadata">${subtype}</div>` : ''}${(bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})</div>` : '' }</div>
+                <div class="output-comment">
+                        ${escapeHTML(desc).replace('\n','<br>')}
+                    </div>
+            </div>
+        `;
 
+    }
+    
     renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null) {
         let highlightedValue = value;
         //Array.isArray(highlightIndices)
@@ -318,7 +378,7 @@ class OutputComponent extends Component {
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
-                <div class="output-value">${highlightedValue}</div>
+                <div class="output-value output-data">${highlightedValue}</div>
                 ${hasHighlights && ifHighlightsComment ? `<div class="output-comment">${ifHighlightsComment}</div>` : ''}
             </div>
         `;
@@ -390,7 +450,7 @@ class OutputComponent extends Component {
         return `
             <div class="output-row full-width">
                 <div class="output-label">Tests:</div>
-                <div class="output-value">${testsHtml}</div>
+                <div class="output-value output-data">${testsHtml}</div>
             </div>
         `;
     }
@@ -427,7 +487,6 @@ class OutputComponent extends Component {
             let prettyIndex = index;
             if (index >= 72) prettyIndex += 4; 
             else if (index >= 36) prettyIndex += 2; 
-            //prettyIndex += 7;
             
             return prettyIndex;
         });
@@ -462,6 +521,8 @@ class OutputComponent extends Component {
 }
 
 function escapeHTML(text) {
+    if (text == null) return '';
+    
     const map = {
         '<': '&lt;',
         '>': '&gt;',
@@ -474,4 +535,3 @@ function escapeHTML(text) {
         return map[match];
     });
 }
-

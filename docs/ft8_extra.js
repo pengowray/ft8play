@@ -710,7 +710,7 @@ function decodeFT8Telemetry(payload) {
   return telemetryHex;
 }
 
-function telemetryToText(binaryStr) {
+function telemetryBitsToText(binaryStr) {
     if (binaryStr.length !== 71) throw new Error("Telemetry must be 71 bits");
 
     // pad the start
@@ -991,8 +991,9 @@ function binaryToInt(binary) {
 }
 
 function bitsToCall(bits) {
-    //return bitsToCallDetails(bits).callsign;
-    const details = bitsToCallDetails(bits);
+    return  bitsToCallDetails(bits);
+    
+    //const details = bitsToCallDetails(bits);
     return `${details.callsign} (${details.type})`;
 }
 
@@ -1009,26 +1010,23 @@ function bitsToCallDetails(bits, extraBit = "") {
     const MAX22 = 4194304;    // 2^22, maximum 22-bit hash value
 
     let result = {
-        rawBits: bits,
-        decodedValue: n,
-        type: null,
-        callsign: null,
+        subtype: null,
+        value: null,
         details: {}
     };
 
     if (extraOn) result.extra = extraBit; // TODO: add "/R" or "/P" etc to call if using 29 bits.
 
-    // Check for special tokens
     if (n < NTOKENS) {
-        result.type = 'special';
+        result.subtype = 'special token';
         if (n === 0) {
-            result.callsign = "DE";
+            result.value = "DE";
         } else if (n === 1) {
-            result.callsign = "QRZ";
+            result.value = "QRZ";
         } else if (n === 2) {
-            result.callsign = "CQ";
+            result.value = "CQ";
         } else if (n < 1003) {
-            result.callsign = `CQ ${(n - 3).toString().padStart(3, '0')}`;
+            result.value = `CQ ${(n - 3).toString().padStart(3, '0')}`;
             result.details.number = n - 3;
         } else if (n < 532444) {
             let code = n - 1003;
@@ -1038,25 +1036,27 @@ function bitsToCallDetails(bits, extraBit = "") {
                 call = (charIndex === 0 ? ' ' : String.fromCharCode(charIndex + 64)) + call;
                 code = Math.floor(code / 27);
             }
-            result.callsign = `CQ ${call.trim()}`;
+            result.value = `CQ ${call.trim()}`;
             result.details.alphabeticCode = call.trim();
+            result.subtype = 'directed CQ'
         } else {
-            result.type = 'undefined';
-            result.callsign = '';
+            result.subtype = 'undefined';
+            result.value = '';
         }
     }
     // Check for 22-bit hash
     else if (n < NTOKENS + MAX22) {
-        result.type = 'hash';
+        result.subtype = 'hash22';
+        result.desc = 'Displayed in Z-Base32 encoding.'
         const hashValue = n - NTOKENS;
         result.details.hashValue = hashValue
         //result.callsign = "<...>";
         //result.callsign = hashBitsPrettyHex(hashValue.toString(2).padStart(22, '0'));
-        result.callsign = hashBitsPrettyZ32(hashValue.toString(2).padStart(22, '0'));
-    }
-    // Standard callsign
-    else {
-        result.type = 'standard';
+        result.value = hashBitsPrettyZ32(hashValue.toString(2).padStart(22, '0'));
+    }  else {
+        // Standard callsign
+
+        result.subtype = 'standard call';
         let c = n - NTOKENS - MAX22;
 
         // Decode last 3 characters (from right to left)
@@ -1085,16 +1085,19 @@ function bitsToCallDetails(bits, extraBit = "") {
                                    String.fromCharCode(firstChar - 11 + 65));
 
         // Construct full callsign
-        result.callsign = result.details.firstChar + result.details.secondChar + 
+        result.value = result.details.firstChar + result.details.secondChar + 
                           result.details.digit + result.details.suffix;
 
-        // Handle special prefixes
-        if (result.callsign.startsWith('3D0') && result.callsign.length > 4) {
-            result.callsign = '3DA0' + result.callsign.slice(3);
+        // Handle special prefixes TODO check this is correct/real
+        if (result.value.startsWith('3D0') && result.value.length > 4) {
+            result.value = '3DA0' + result.value.slice(3);
             result.details.specialPrefix = '3DA0';
-        } else if (result.callsign.startsWith('3X0') && result.callsign.length > 4) {
-            result.callsign = 'Q' + result.callsign.slice(1);
+            result.subtype = 'special prefix callsign';
+
+        } else if (result.value.startsWith('3X0') && result.value.length > 4) {
+            result.value = 'Q' + result.value.slice(1);
             result.details.specialPrefix = 'Q';
+            result.subtype = 'Q code / callsign';
         }
     }
 
@@ -1142,8 +1145,9 @@ function grid4ToG15(input) {
 }
 
 function bitsToGrid4OrReportWithType(bits) {
-    const details = bitsToGrid4OrReportDetails(bits)
-    return `${details.result} (${details.type})`;
+    return bitsToGrid4OrReportDetails(bits);
+    //const details = bitsToGrid4OrReportDetails(bits)
+    //return `${details.result} (${details.type})`;
 }
 
 function bitsToGrid4OrReport(bits) {
@@ -1163,18 +1167,27 @@ function bitsToGrid4OrReportDetails(bits) {
         let j3 = Math.floor(remainder / 10);
         let j4 = remainder % 10;
 
-        return { result: String.fromCharCode('A'.charCodeAt(0) + j1) +
+        let ret = { value: String.fromCharCode('A'.charCodeAt(0) + j1) +
                String.fromCharCode('A'.charCodeAt(0) + j2) +
                j3.toString() +
-               j4.toString(), type: 'grid' };
+               j4.toString(), subtype: 'Maidenhead locator' };
+        const latlon = latLonForGrid(ret.value);
+        let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
+        if (ret.value == 'RR73') {
+            desc += "\n*RR73 means 'report received and best regards', even when it's encoded as a Maidenhead locator.";
+            ret.subtype = 'Maidenhead locator*';
+        }
+        return { ...ret, ...latlon, desc };
+        
     } else {
         const irpt = g15 - MAXGRID4;
-        if (irpt === 1) return { result: '', type: 'blank' };
-        if (irpt === 2) return { result: 'RRR', type: 'special' };
-        if (irpt === 3) return { result: 'RR73', type: 'special' };
-        if (irpt === 4) return { result: '73', type: 'special' };
+        if (irpt === 1) return { value: '', subtype: 'blank' };
+        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR means reception report received' };
+        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73: report received and best regards' };
+        if (irpt === 4) return { value: '73', subtype: 'special token', desc: "73 means 'best regards'" };
 
-        return { result: (irpt - 35).toString(), type: 'signal' };
+        const value = (irpt - 35).toString();
+        return { value, subtype: 'signal report', units: 'dB' };
     }
 }
 
@@ -1183,7 +1196,9 @@ function bitsToReport(bits) {
 
     if (bits.length !== 5) throw new Error("Report must be 5 bits");
     const n = parseInt(bits, 2); // 0 to 31
-    return ((n * 2) - 30).toString();
+    const value = ((n * 2) - 30).toString();
+    return { value, subtype: 'signal report', units: 'dB' }; // desc: 'Possible values: –30 to +32 dB'
+
 }
 
 function bitsToR2(bits) { // aka bitsToRR73
@@ -1331,16 +1346,71 @@ function bitsToARRLSection(bits) {
     return ARRL_SEC[i];
 }
 
-function bitsToTxNumber(bits) {
+function bitsToTxDetails(bits) {
     // n4 Number of transmitters: 1-16, 17-32
     if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
     const n = parseInt(bits, 2);
-    return `${n + 1} or ${n + 17}`;
+    const low = `${n + 1}`;
+    const high = `${n + 17}`;
+    return { value: low, short: low, long: `${low} or ${high}`, subtype: 'transmitter(s)', desc: `This value may refer to ${low} or ${high} transmitter(s)` };
 }
 
 function bitsToRST(bits) {
     //r3 Report: 2-9, displayed as 529 – 599 or 52 - 59
     if (bits.length !== 3) throw new Error("RST must be 3 bits");
     const n = parseInt(bits, 2) + 2;
-    return `5${n} or 5${n}9`;
+    //return `5${n} or 5${n}9`;
+    const low = `5${n}`;
+    const high = `5${n}9`;
+    return { value: high, short: low, long: `${low} or ${high}`, subtype:'RST', desc: `May refer to ${low} or ${high}` };
+
 }
+
+function bitsToBigIntString(binaryString) {
+    // convert bit string to an integer display.
+    // works for long strings.
+
+    const MAX_SAFE_LENGTH = 52; // JavaScript's max safe integer is 2^53 - 1
+    
+    if (binaryString.length <= MAX_SAFE_LENGTH) {
+        return parseInt(binaryString, 2).toString();
+    }
+
+    let decimal = '0';
+    const binaryLength = binaryString.length;
+
+    for (let i = 0; i < binaryLength; i++) {
+        if (binaryString[i] === '1') {
+            // Calculate 2^(binaryLength - 1 - i)
+            let power = '1';
+            for (let j = 0; j < binaryLength - 1 - i; j++) {
+                power = addStrings(power, power);
+            }
+            decimal = addStrings(decimal, power);
+        }
+    }
+
+    return decimal;
+}
+
+function addStrings(num1, num2) {
+    let i = num1.length - 1;
+    let j = num2.length - 1;
+    let carry = 0;
+    let result = '';
+
+    while (i >= 0 || j >= 0 || carry > 0) {
+        const digit1 = i >= 0 ? parseInt(num1[i]) : 0;
+        const digit2 = j >= 0 ? parseInt(num2[j]) : 0;
+        const sum = digit1 + digit2 + carry;
+        result = (sum % 10) + result;
+        carry = Math.floor(sum / 10);
+        i--;
+        j--;
+    }
+
+    return result;
+}
+
+const manybits = '01110100010101011110100111011111000001011100001111101001011001010110011';
+console.log(bitsToBigIntString(manybits));

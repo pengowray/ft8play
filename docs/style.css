@@ -1,6 +1,9 @@
 :root {
     --bg-color: #ffffff;
     --text-color: #333333;
+    --text-color-comment: #666;
+    --text-color-tertiary: #338265;
+    
     --input-bg: #f0f0f0;
     --button-bg: #4CAF50;
     --button-text: #ffffff;
@@ -19,6 +22,9 @@
 .dark-mode {
     --bg-color: #222222;
     --text-color: #f0f0f0;
+    --text-color-comment: #999;
+    --text-color-tertiary: #81c1a9;
+
     --input-bg: #444444;
     --button-bg: #45a049;
     --button-text: #ffffff;
@@ -577,10 +583,14 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--value-bg);
     padding: 5px;
     border-radius: 4px;
+}
+
+.output-data { /* modifies .output-value */
     font-family: monospace;
     white-space: pre-wrap;
     word-break: break-all;
 }
+
 .checks {
     display: flex;
     flex-wrap: wrap;
@@ -700,3 +710,72 @@ body:not(.dark-mode) #piano-roll {
     background-color: #1d4c1d;
     color: #66ff66;
 }
+
+/* Output message fields */
+
+
+.output-row-field {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 10px;
+    margin-bottom: 10px;
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.output-label-field {
+    grid-column: 1 / -1;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.output-sublabel {
+    font-size: 0.9em;
+    color: var(--text-color-comment);
+    font-weight: normal;
+}
+
+.output-value-field {
+    grid-column: 1 / -1;
+    background-color: var(--value-bg);
+    padding: 5px;
+    border-radius: 4px;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.output-description {
+    grid-column: 1 / -1;
+    font-size: 0.9em;
+    color: var(--text-color-comment);
+}
+
+.output-metadata {
+    grid-column: 1 / -1;
+    font-size: 0.8em;
+    color: var(--text-color-tertiary);
+    margin-top: 5px;
+}
+
+.output-metadata-item {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.output-comment-field {
+    grid-column: 1 / -1;
+    font-size: 0.8em;
+    color: var(--text-color-comment);
+    margin-top: 5px;
+    font-style: italic;
+}
+
+.output-raw-values {
+    font-size: 0.6em;
+    color: var(--text-color-comment);
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+

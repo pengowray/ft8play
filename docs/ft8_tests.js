@@ -8,7 +8,7 @@
     { notest: true, name: 'test pattern: coincidental costas', comment: 'A technically valid FT8 message.', value: '8M6TVW/R R3NFJ/R DN12' },
     { notest: true, name: "error example: one bit flipped", comment: 'This message contains a single bit error.', value: "01101110111011001100001110100110100001110001110011001110110010101100101000000 00101000101001 11011001110010010010001100011001011000001110110010001010011110110001000011110111001" },
     { notest: true, name: 'error example: mutliple RX errors demo', value: '3140652 00306403035757676071360401511 3140652 01713355253025012537125536152 3140652'},
-    { notest: true, name: "error example: wrong sync symbols", comment: 'Example of a message contains errors in the sync symbols.', value: "5550001 00000000011541472111206301447 5550001 52112705440021501172302627711 5550001" },
+    { notest: true, name: "error example: wrong sync symbols", comment: 'Example of a message containing errors in the sync symbols.', value: "5550001 00000000011541472111206301447 5550001 52112705440021501172302627711 5550001" },
     { notest: true, name: 'error example: telemetry too long (bad input)', value: 'Telemetry: F20F1044242408F20F' },
   ]
   
