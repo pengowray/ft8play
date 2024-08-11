@@ -1,3 +1,6 @@
+const REFERENCE = 'expected';
+const DECODED = 'found';
+
 class OutputComponent extends Component {
     create() {
     }
@@ -26,6 +29,7 @@ class OutputComponent extends Component {
             decodedText: message.reDecodedResult.decodedText,
             symbols: message.symbolsText,
             packed: packedToHexStrSp(message.packedData),
+            veryPacked: packedToHexStr(message.packedData),
             codeword: bitsNoCosta, // 174 bits
             messageBits: bitsNoCosta.slice(0, 77),
             crcBits: bitsNoCosta.slice(77, 91),            
@@ -143,8 +147,8 @@ class OutputComponent extends Component {
             };
             tests.push(test);
             if (!match) {
-                renderedRows += this.renderRowData(`${test.name} (reference)`, test.expected);
-                renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
+                renderedRows += this.renderRowData(`${test.name}`, test.expected, null, REFERENCE);
+                renderedRows += this.renderRowData(`${test.name}`, test.actual, null, DECODED);
             }
         }
 
@@ -152,7 +156,7 @@ class OutputComponent extends Component {
         if (expectedMessage) {
             const match = (expectedMessage.trim() === this.message.reDecodedResult.decodedText.trim());
             const test = {
-                name: "Decoded",
+                name: "Message text",
                 result: (expected.error ? (match ? 'warning' : 'warning') : (match ? 'ok' : 'error')),
                 resultText: (expected.error ? (match ? 'Matched test*' : 'Did not match test*') : (match ? 'Matched test' : 'Did not match test')),
                 expected: expectedMessage,
@@ -173,8 +177,8 @@ class OutputComponent extends Component {
             }
             
             if (!match) {
-                renderedRows += this.renderRowData(`${test.name} (reference)`, test.expected);
-                renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
+                renderedRows += this.renderRowData(`${test.name}`, test.expected, null, REFERENCE);
+                renderedRows += this.renderRowData(`${test.name}`, test.actual, null, DECODED);
             }
         }
 
@@ -192,14 +196,13 @@ class OutputComponent extends Component {
             if (!match) {
                 const prettyExpected = symbolsPretty(test.expected);
                 const prettyActual = symbolsPretty(test.actual);
-                renderedRows += this.renderRowData(`${test.name} (reference)`, prettyExpected);
-                //renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
-                renderedRows += this.renderRowDataHighlights(`${test.name} (decoded)`, prettyActual, this.getDiffHighlights(prettyExpected, prettyActual), 'Red highlights show symbols which differ from the test reference');
+                renderedRows += this.renderRowData(`${test.name}`, prettyExpected, null, REFERENCE);
+                renderedRows += this.renderRowDataHighlights(`${test.name}`, prettyActual, this.getDiffHighlights(prettyExpected, prettyActual), 'Red highlights show symbols which differ from the test reference', null, DECODED);
 
                 const expectedBits = symbolsToBitsStrNoCosta(test.expected).slice(0, 77);
                 const actualBits = symbolsToBitsStrNoCosta(test.actual).slice(0, 77);
-                renderedRows += this.renderRowData(`Message bits (reference)`, expectedBits);
-                renderedRows += this.renderRowDataHighlights(`Message bits (decoded)`, actualBits, this.getDiffHighlights(expectedBits, actualBits), 'Red highlights show bits which are flipped compared to the test reference.');
+                renderedRows += this.renderRowData(`Message bits`, expectedBits, null, REFERENCE);
+                renderedRows += this.renderRowDataHighlights(`Message bits`, actualBits, this.getDiffHighlights(expectedBits, actualBits), 'Red highlights show bits which are flipped compared to the test reference.', null, DECODED);
 
             } 
         }
@@ -222,12 +225,11 @@ class OutputComponent extends Component {
                 ${this.renderSubheading('Encoding')}
 
                 ${this.renderChecks('Checks', data.checks)}
-                ${this.renderRowData('Message type', `(${data.ft8MessageType}) ${data.messageTypeInfo}`)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Use 3140652.')}
-                ${this.renderRowData('Packed', data.packed)}
-                ${this.renderRowData('Message (77 bits)', data.messageBits)}
-                ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, this.getCRCHighlights(data.crcCheck))}
-                ${this.renderRowDataHighlights('Parity (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated for the Message and CRC, it would differ in the above highlighted bits.')}
+                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Use 3140652.', null, '79 tones')}
+                ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Right padded.`, 'packed')}
+                ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
+                ${this.renderRowDataHighlights('CRC', data.crcBits, this.getCRCHighlights(data.crcCheck), null, null, '14 bits')}
+                ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated for the Message and CRC, it would differ in the above highlighted bits.', null, '83 bits')}
                 ${(!data.parityCheck.success) ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Given the LPDC data, red highlighted bits are the most likely to be incorrect. Orange highlights are less likely errors. The 174-bits are the combined Message + CRC + LDPC.') : ''}
                 ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'Single step error repair using parity check data. May repair the message if there are a small number of errors. Copy this into the input and encode to see the result.', 'corrected') : ''  }
                 
@@ -247,19 +249,6 @@ class OutputComponent extends Component {
 
             </div>
         `;
-//to only show when not message type:
-//${data.inputType !== 'message' ? this.renderRow('Input type', data.inputType) : ''}
-
-//to use other renderer:
-//                ${data.tests ? this.renderTests(data.tests) : ''}
-
-// old decode renderer: (now part of checks)
-//${this.renderDecodedInfo(data.decoded)}
-
-//unhighlighted:
-//${this.renderRowData('Symbols', symbolsPretty(data.symbols))}
-//${this.renderRowData('CRC (14 bits)', data.crcBits)}
-//${this.renderRowData('LDPC (83 bits)', data.parityBits)}
 
         this.container.innerHTML = '';
         this.container.appendChild(outputBox);
@@ -279,10 +268,8 @@ class OutputComponent extends Component {
             annotationDefinitions[ft8MessageType].forEach(annotationDef => {
                 let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits);
 
-                const label = annotation.tag ?? annotation.label ?? annotation.shortLabel;
-                //TODO: move tag to own field
-                //if (annotation.tag != null && label != annotation.tag) label += ` (${annotation.tag})`;
-                const secondaryLabel = (annotation.tag != null) ? annotation.label ?? annotation.shortLabel : null;
+                const label = (annotation.tag != null) ? annotation.label ?? annotation.shortLabel : null;
+                const secondaryLabel = annotation.tag ?? annotation.label ?? annotation.shortLabel;
 
                 const pos = annotation.bits.length === 1 ?
                       `bit ${annotation.start + 1}`
@@ -300,10 +287,10 @@ class OutputComponent extends Component {
         return rowContent;
     }
 
-    renderRowData(label, value, comment = null) {
+    renderRowData(label, value, comment = null, secondaryLabel = null) {
         return `
             <div class="output-row">
-                <div class="output-label">${label}</div>
+                <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
                 <div class="output-value output-data">${escapeHTML(value)}</div>
                 ${comment ? `<div class="output-comment">${escapeHTML(comment).replace('\n','<br>')}</div>` : ''}
             </div>
@@ -329,7 +316,7 @@ class OutputComponent extends Component {
     
         return `
             <div class="output-row">
-                <div class="output-label">${secondaryLabel} ${label ? `<span class="output-sublabel">${label}` : ''}</span></div>
+                <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
                 <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ subtype || desc ? `<div class="output-metadata">${subtype}</div>` : ''}${(bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})</div>` : '' }</div>
                 <div class="output-comment">
                         ${escapeHTML(desc).replace('\n','<br>')}
@@ -339,7 +326,7 @@ class OutputComponent extends Component {
 
     }
     
-    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null) {
+    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null, secondaryLabel = null) {
         let highlightedValue = value;
         //Array.isArray(highlightIndices)
         //highlightIndices instanceof Set
@@ -377,7 +364,7 @@ class OutputComponent extends Component {
         
         return `
             <div class="output-row">
-                <div class="output-label">${label}</div>
+                <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
                 <div class="output-value output-data">${highlightedValue}</div>
                 ${hasHighlights && ifHighlightsComment ? `<div class="output-comment">${ifHighlightsComment}</div>` : ''}
             </div>

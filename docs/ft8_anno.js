@@ -1,5 +1,5 @@
-const def_i3n3 = { label: "Type", tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
-const def_i3 = { label: "Type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
+const def_i3n3 = { label: "Message Type", tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
+const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
 
 // note: don't use shortLabel if not needed to display on tribble bit display
 
