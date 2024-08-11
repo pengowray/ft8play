@@ -60,7 +60,9 @@ Payload/symbol input formats: (for debugging or advanced uses)
 
 ## To do
 - [ ] decode FT8 audio
-- [ ] fully support encoding and decoding of all ft8 message types
+- [X] fully support decoding of all ft8 message types
+- [ ] fully support encoding of all ft8 message types
+- [ ] superfox mode
 - [ ] have the UI suggest alternative encoding methods when available
 - [ ] optimizations
 - [ ] FFT visualization
@@ -70,8 +72,9 @@ Payload/symbol input formats: (for debugging or advanced uses)
 ## Thanks
 
 Software libraries used:
- - [ft8_lib which I've forked to add emscripten (wasm) support](https://github.com/pengowray/ft8_lib/tree/ft8_wasm)
+ - [ft8_lib](https://github.com/kgoba/ft8_lib) (MIT) — which I've [forked to add emscripten (wasm) support](https://github.com/pengowray/ft8_lib/tree/ft8_wasm)
  - [D3 javascript library](https://d3js.org/)
+ - [HamGridSquare.js](https://gist.github.com/stephenhouser/4ad8c1878165fc7125cb547431a2bdaa) (MIT) by Paul Brewer KI6CQ
 
 ## Privacy
 - All processing is done on your local machine or device. Your input is not sent anywhere.
