@@ -317,10 +317,8 @@ class OutputComponent extends Component {
         return `
             <div class="output-row">
                 <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
-                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ subtype || desc ? `<div class="output-metadata">${subtype}</div>` : ''}${(bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})</div>` : '' }</div>
-                <div class="output-comment">
-                        ${escapeHTML(desc).replace('\n','<br>')}
-                    </div>
+                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}${(bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})</div>` : '' }</div>
+                <div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>
             </div>
         `;
 

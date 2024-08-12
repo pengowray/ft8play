@@ -77,20 +77,20 @@ const annotationDefinitions = {
         def_i3
     ],
     "4": [ // Non-standard call: h12 c58 h1 r2 c1
-        { label: "hash", tag:'h12', start: 0, length: 12, getValue: bitsToHash },
-        { label: "Nonstandard call", tag:'c58', start: 12, length: 58, getValue: bitsToNonstandardCall },
+        { label: "Hash", tag:'h12', start: 0, length: 12, getValue: bitsToHash },
+        { label: "Call", tag:'c58', start: 12, length: 58, getValue: bitsToNonstandardCallDetails },
         { label: "Call order", shortLabel: "h", tag: 'h1', start: 70, length: 1, getValue: (bit) => bit === '1' ? '1 (Hash is second callsign)' : '0 (Hash is first callsign)' },
         { label: "Signoff", tag:'r2', start: 71, length: 2, getValue: bitsToR2 },
         { label: "CQ", tag:'c1', start: 73, length: 1, getValue: (bit) => bit === '1' ? '1 (First callsign is CQ. Ignore hash)' : '0' },
         def_i3
     ],
-    "5": [ // EU VHF Contest with 6-digit grid locator h12 h22 R1 r3 s11 g25
-        { label: "Call1", tag:'h12', start: 0, length: 28, getValue: (bits) => bitsToCall(bits) },
-        { label: "Call2", tag:'h22', start: 28, length: 28, getValue: (bits) => bitsToCall(bits) },
-        { label: "R", tag:'R1', start: 56, length: 1, getValue: (bit) => bit === '1' ? 'R' : '' },
-        { label: "Report", shortLabel:"RST", tag:'r3', start: 57, length: 3, getValue: bitsToRST },
-        { label: "Serial", tag:'s11', desc: 'Serial number (0-2047)', start: 60, length: 13, getValue: bitsToSerialOrState },
-        { label: "Grid6", tag:'g25', start: 57, length: 25, getValue: bitsToGrid6 },
+    "5": [ // EU VHF Contest with 6-digit grid locator
+        { label: "Hash1", tag:'h12', start: 0, length: 12, getValue: bitsToHash },
+        { label: "Hash2", tag:'h22', start: 12, length: 22, getValue: bitsToHash },
+        { label: "R", tag:'R1', start: 34, length: 1, getValue: (bit) => bit === '1 R' ? 'R' : '0' },
+        { label: "Report", shortLabel:"RST", tag:'r3', start: 35, length: 3, getValue: bitsToRST },
+        { label: "Serial", tag:'s11', desc: 'Serial number (0-2047)', start: 38, length: 11, getValue: bitsToSerial },
+        { label: "Grid6", tag:'g25', start: 49, length: 25, getValue: bitsToGrid6 },
         def_i3
     ],
     "6": [ // undefined
@@ -168,10 +168,14 @@ function bitsToGrid6(bits) {
 function bitsToHash(bits) {
     //return hashBitsPrettyHex(bits);
     const hashed = hashBitsPrettyZ32(bits);
-    return {value: hashed, subtype:'hash' + bits.length, desc: 'Displayed in Z-Base32 encoding.'};
+    return {value: hashed, subtype:'hash' + bits.length, desc: 'Displayed in Z-Base32 encoding'};
 }
 
 //TODO
 function bitsToSerialOrState(bits) {
     return placeholder(bits);
+}
+
+function bitsToSerial(bits) {
+    return {value: bitsToBigIntString(bits).toString() };
 }

@@ -1047,7 +1047,7 @@ function bitsToCallDetails(bits, extraBit = "") {
     // Check for 22-bit hash
     else if (n < NTOKENS + MAX22) {
         result.subtype = 'hash22';
-        result.desc = 'Displayed in Z-Base32 encoding.'
+        result.desc = 'Displayed in Z-Base32 encoding'
         const hashValue = n - NTOKENS;
         result.details.hashValue = hashValue
         //result.callsign = "<...>";
@@ -1214,9 +1214,13 @@ function bitsToR2(bits) { // aka bitsToRR73
     throw new Error("Invalid R2 bits");
 }
 
-function bitsToNonstandardCall(binary) {
+
+function bitsToNonstandardCallDetails(bits) {
+    return { value: bitsToNonstandardCall(bits), subtype: 'Nonstandard callsign' }
+}
+function bitsToNonstandardCall(bits) {
     const c = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/';
-    let n58 = BigInt('0b' + binary);
+    let n58 = BigInt('0b' + bits);
     let callsign = '';
   
     for (let i = 0; i < 11; i++) {
