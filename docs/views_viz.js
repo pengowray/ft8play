@@ -50,7 +50,6 @@ class VizComponent extends Component {
 
     messageUpdate() {
         // Update any cached data that depends on the message
-        console.log('VizComponent.messageUpdate()');
 
         if (this.message != null && this.message.isplaying) {
             this.onPlay();

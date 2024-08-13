@@ -165,12 +165,6 @@ function bitsToGrid6(bits) {
     return placeholder(bits);
 }
 
-function bitsToHash(bits) {
-    //return hashBitsPrettyHex(bits);
-    const hashed = hashBitsPrettyZ32(bits);
-    return {value: hashed, subtype:'hash' + bits.length, desc: 'Displayed in Z-Base32 encoding'};
-}
-
 //TODO
 function bitsToSerialOrState(bits) {
     return placeholder(bits);

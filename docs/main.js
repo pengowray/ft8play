@@ -28,7 +28,7 @@ function initializeUI() {
     const encodeOutput = document.getElementById('output');
     const output = document.getElementById('output');
     const errorOutput = document.getElementById('error-output');
-    //const decodeOutput = document.getElementById('decode-output');
+    const messageContent = document.getElementById('message-content');
 
     const toggleSettingsButton = document.getElementById('toggle-settings');
     const audioSettings = document.getElementById('audio-settings');
@@ -95,17 +95,18 @@ function initializeUI() {
                 if (selectedType === 'ft8codeMsg') {
                     const selectedTest = testInputs_ft8code[selectedIndex];
                     messageInput.value = selectedTest.message;
-                    const expectedResults = selectedTest;
+                    const expectedResults = { ...selectedTest, testType: selectedType};
                     doEncode(expectedResults);
                 } else if (selectedType === 'ft8codeSymbols') {
                     const selectedTest = testInputs_ft8code[selectedIndex];
                     messageInput.value = selectedTest.symbols;
-                    const expectedResults = {...selectedTest, ...{symbols:null}}; // don't bother testing symbols when they're in the input
+                    const expectedResults = {...selectedTest, ...{symbols:null}, testType: selectedType}; // don't bother testing symbols when they're in the input
                     doEncode(expectedResults);
                 } else if (selectedType === 'example') {
                     const selectedTest = ft8_examples[selectedIndex];
                     messageInput.value = selectedTest.value;
-                    doEncode(selectedTest); // to add a comment
+                    const nonTest = { ...selectedTest, testType: selectedType};
+                    doEncode(nonTest); // to add a comment
                 }
             }
         });
@@ -234,37 +235,71 @@ function initializeUI() {
     encodeButton.addEventListener('click', () => {
         doEncode();
     });
+    
+    // Message from handleEncode, is in this scope so we can get encoding errors out more easily.
+    let message = null; // type {FT8Message}
 
     function doEncode(testData = null) {
         try {
             handleEncode(testData);
+            const hasErrors = handleError(message);
          
         } catch (error) {
-            //output.innerHTML = "Error: " + error.message;
-            errorOutput.innerHTML = "Error: " + error;
-            console.error("handle encode error", error);
+            handleError(message, error);
         }
+    }
+    
+    // displays errors
+    // returns true if there are errors
+    function handleError(message, exception = null) {
+        let strings = [];
+        
+        if (message.encodeError_ft8lib) {
+            strings.push(`ft8_lib error: ${message.encodeError_ft8lib}`);
+        }
+
+        if (exception != null) {
+            console.error("exception", exception);
+            strings.push(`Exception: ${exception}`);
+        }
+        if (message.error) {
+            strings.push(`General error: ${message.error}`);
+        }
+
+        if (message.encodeError) {
+            strings.push(`encoding error: ${message.encodeError_ft8lib}`);
+        }
+        
+        if (strings.length > 0) {
+            errorOutput.style.display = 'block';
+            messageContent.style.display = 'none';
+            errorOutput.innerHTML = strings.join("<br>");
+            return true;
+        } else {
+            errorOutput.innerHTML = '';
+            errorOutput.style.display = 'none';
+            messageContent.style.display = 'block';
+            return false;
+        }
+        
     }
     
     function handleEncode(testData = null) {
         let inputText = messageInput.value;
-        const message = new FT8Message(inputText); //messageManager.createMessage(inputText);
+        message = new FT8Message(inputText); //messageManager.createMessage(inputText);
         message.expectedResults = testData;
 
         message.encode();
         if (message.error != null) {
-            errorOutput.textContent = "Error: " + message.error;
             return;
-        } else {
-            errorOutput.textContent = "";
         }
+
         // gather audio options
         const freqData = parseFrequencyInput(baseFreqInput.value);
         if (!freqData) {
-            errorOutput.innerHTML = "Invalid frequency input";
-            return;
+            throw new Error("Invalid frequency input");
         }
-        console.log(`freq: ${freqData.baseHz} (${freqData.customTones.join(' ')})`);
+        //console.log(`freq: ${freqData.baseHz} (${freqData.customTones.join(' ')})`);
         const sampleRate = parseInt(sampleRateSelect.value);
         message.setAudioOptions(sampleRate, freqData.baseHz, freqData.customTones);
 
@@ -277,16 +312,8 @@ function initializeUI() {
 
         if (message.audioSamples.length > 0) {
             //setupAudioPlayback(message);
-
         } else {
-            console.error("No audio data generated");
-            if (errorOutput != null && errorOutput.innerHTML != null && errorOutput.innerHTML.length > 0) {
-                errorOutput.innerHTML += "<br>";
-            } else {
-                errorOutput.innerHTML = "";
-            }
-            errorOutput.innerHTML += "No audio data generated";
-            //audioControls.style.display = 'none';
+            throw new Error("Error generating audio data generated");
         }
     }
 

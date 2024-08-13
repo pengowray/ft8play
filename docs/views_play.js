@@ -17,8 +17,6 @@ class PlayBtnComponent extends Component {
         if (this.playAudioTimedButton) this.playAudioTimedButton.addEventListener('click', () => this.playAudioTimedClicked());
         if (this.stopAudioButton) this.stopAudioButton.addEventListener('click', () => this.stopAudioClicked());
         if (this.downloadAudioButton) this.downloadAudioButton.addEventListener('click', () => this.downloadAudioClicked());
-
-        console.log("PlayComponent created", this.index, this.playAudioButton, this.playAudioTimedButton, this.stopAudioButton, this.downloadAudioButton, this.countdownDiv);
     }
 
     /**

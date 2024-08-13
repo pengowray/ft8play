@@ -19,6 +19,12 @@ class OutputComponent extends Component {
         const message = this.message;
         const bitsNoCosta = symbolsToBitsStrNoCosta(message.symbolsText);
         
+        //move me
+        const testType = this.message?.expectedResults?.testType ?? null;
+        const isATest = (testType !== null && testType !== '') ? 'yes' : null;
+        //const isATest = (testType === 'ft8codeSymbols' || testType === 'ft8codeMsg') ? 'yes' : null;
+        //const isADemo = (testType === 'example') ? 'yes' : null;
+
         return {
             inputText: message.inputText,
             inputType: message.inputType,
@@ -44,7 +50,9 @@ class OutputComponent extends Component {
                 null,
             encodeError: message.encodeError_ft8lib,
             tests: this.prepareTests(),
-            repaired: message.getParityRepairedCodeword()
+            repaired: message.getParityRepairedCodeword(),
+            testType,
+            isATest,
         };
     }
 
@@ -77,7 +85,7 @@ class OutputComponent extends Component {
             resultText: 'unchecked',
         };
         
-        if (inputType === 'message') {
+        if (inputType === 'default') {
             decodeTest2.result = 'ok';
 
             if (normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
@@ -218,6 +226,7 @@ class OutputComponent extends Component {
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
                 ${this.renderRowText('Input type', data.inputType)}
+                ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType }) : ''}
 
                 ${this.renderSubheading('Message Fields')}
                 ${this.renderRows(data.messageBits, data.ft8MessageType)}
@@ -303,25 +312,33 @@ class OutputComponent extends Component {
             tag,
             value,
             desc,
+            descNoEsc,
             subtype,
             bits,
             rawIntValue,
             start,
             length,
             comment,
-            units
+            units,
+            unhashed,
+            rawAppend
         } = fieldData;
     
-        const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
-    
+        //todo:
+        //const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
+
+        //todo: less hackish escapeHTML toggle
+
         return `
             <div class="output-row">
                 <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
-                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}${(bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})</div>` : '' }</div>
-                <div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>
+                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ unhashed ? `<span class="output-unhashed"> ${unhashed}</span>` : '' }` 
+                + `${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}` 
+                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }</div>`
+                + `${desc ? `<div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>` : ''}` 
+                + `${descNoEsc ? `<div class="output-comment">${descNoEsc}</div>` : ''}
             </div>
         `;
-
     }
     
     renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null, secondaryLabel = null) {
@@ -515,8 +532,7 @@ function escapeHTML(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-
-    return text.replace(/[<>&"']/g, function(match) {
+    return text.toString().replace(/[<>&"']/g, function(match) {
         return map[match];
     });
 }
