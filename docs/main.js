@@ -253,24 +253,27 @@ function initializeUI() {
     // returns true if there are errors
     function handleError(message, exception = null) {
         let strings = [];
+        let failed = false;
         
         if (message.encodeError_ft8lib) {
             strings.push(`ft8_lib error: ${message.encodeError_ft8lib}`);
+            // not failure yet (may have fallen back to freetext)
         }
-
         if (exception != null) {
             console.error("exception", exception);
             strings.push(`Exception: ${exception}`);
+            failed = true;
         }
         if (message.error) {
             strings.push(`General error: ${message.error}`);
+            failed = true;
         }
-
         if (message.encodeError) {
-            strings.push(`encoding error: ${message.encodeError_ft8lib}`);
+            strings.push(`encoding error: ${message.encodeError}`);
+            failed = true;
         }
         
-        if (strings.length > 0) {
+        if (failed) {
             errorOutput.style.display = 'block';
             messageContent.style.display = 'none';
             errorOutput.innerHTML = strings.join("<br>");

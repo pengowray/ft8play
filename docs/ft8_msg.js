@@ -191,9 +191,13 @@ class FT8Message extends EventTarget {
                 input = normalizeBracketedFreeText(input);
                 this.packedData = encodeFT8FreeText(input);
                 break;
-            case 'symbols':
+            case '79 symbols':
                 input = normalizeSymbols(input);
                 this.symbolsText = input;
+                break;
+            case '58 symbols':
+                input = normalizeSymbols(input);
+                this.symbolsText = symbols58ToSymbols79(input);
                 break;
             case 'packed':
                 input = normalizePackedData(input);
@@ -211,38 +215,43 @@ class FT8Message extends EventTarget {
             case '77 bits':
                 this.packedData = new Uint8Array(bitsToHexForTelemetry(normalizeBinary(input)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 break;
-            case '77 bits + CRC':
+            case '91 bits':
                 this.symbolsText = binary91ToSymbols(normalizeBinary(input));
                 break;
-            case '77 bits + CRC + LDPC':
+            case '174 bits':
                 this.symbolsText = binary174ToSymbols(normalizeBinary(input));
                 break;
-            case '237 bits (binary)': // symbols (as normal binary, including sync)
+            case '237 bits': // symbols (as normal binary, including sync)
                 this.symbolsText = binary237ToSymbols(normalizeBinary(input));
                 break;
-            case '237 bits (graycode)': // symbols (as graycode bits, including sync)
+            case '237 grits': // symbols (as graycode bits, including sync)
                 this.symbolsText = grayBitsToSymbols(input);
                 break;
             case 'default':
             default:
                 input = normalizeMessage(input);
+                addHashesFromInput(this.inputText);
+
                 const packingResult = messageToPackedData(input);
 
                 if (packingResult.success) {
                     console.log("Packed data:", packingResult);
                     this.packedData = packingResult.data;
                     
-                    addHashesFromInput(this.inputText);
                     
                 } else {
                     this.encodeError_ft8lib = `Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`;
                     console.log("falling back to free text because error: ", this.encodeError_ft8lib);
                     //this.encodeError = this.encodeError_ft8lib;
 
-                    // attempt free text
+                    // attempt free text fallback
                     input = normalizeBracketedFreeText(input); // in case there's brackets
                     this.packedData = encodeFT8FreeText(input);
 
+                    if (this.packedData == null) {
+                        this.encodeError = "Failed to encode as free text";
+                        throw new Error(this.encodeError);
+                    }
                     //if failed will try to encode as free text
                 }
                 break;
@@ -583,7 +592,11 @@ function doDetectInputType(inputOriginal) {
     }
 
     if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
-        return 'symbols';
+        return '79 symbols';
+    }
+
+    if (/^[0-7]{58}$/.test(normalizeSymbols(input))) {
+        return '58 symbols';
     }
 
     // Check if input is hex string (packed data); pairs of hex must be together.
@@ -600,16 +613,16 @@ function doDetectInputType(inputOriginal) {
         if (normBinary.length === 77) {
             return '77 bits'; // Source-encoded message, 77 bits
         } else if (normBinary.length === 91) { // 77 + 14 bits
-            return '77 bits + CRC';
+            return '91 bits';
         } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
-            return '77 bits + CRC + LDPC'
+            return '174 bits'
         } else if (normBinary.length === 237) { // 77 + 14 + 83 + 21*3
             //const normBinary = '010001110000101100011';
             const grayCosta = "011001100000110101010";
             if (normBinary.startsWith(grayCosta) || normBinary.endsWith(grayCosta) || normBinary.slice(108, 129) == grayCosta) {
-                return '237 bits (graycode)';
+                return '237 grits';
             }
-            return '237 bits (binary)'
+            return '237 bits'
         } else {
             //TODO: warning
         }
@@ -632,7 +645,6 @@ function scaleToRange(numbers, newMin, newMax) {
     return numbers.map(num => (num - originalMin) * scale + newMin);
 }
 
-
 function findMinAndMax(numbers) {
     let min = Infinity;
     let max = -Infinity;
@@ -644,3 +656,15 @@ function findMinAndMax(numbers) {
     
     return { min, max };
 }
+
+const inputTypeDescriptions = {
+    '77 bits': 'Payload data',
+    '91 bits': 'Payload + CRC',
+    '174 bits': 'Payload + CRC + LDPC',
+    '237 bits': 'All symbols mapped to regular binary tribbles',
+    '237 grits': 'All symbols as graycode triplets',
+    '58 symbols': 'FSK tone data without sync tones',
+    '79 symbols': 'Full FSK tone data',
+    'packed': 'Payload as hexadecimal (right padded)',
+    'default': 'FT8 message text',
+};

@@ -372,6 +372,14 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--annotation3-bg);
 }
 
+.annotations-row5 .annotation {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+    background-color: var(--annotation-bg);
+}
+
+
 .symbol {
     font-weight: bold;
 }

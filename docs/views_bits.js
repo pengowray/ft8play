@@ -153,6 +153,11 @@ class TribbleComponent extends Component {
         annotationsRow4.className = 'annotations-row4';
         annotationsRow4.style.display = 'contents';
 
+        const annotationsRow5 = document.createElement('div');
+        annotationsRow5.className = 'annotations-row5';
+        annotationsRow5.style.display = 'contents';
+        let requireAnnotationsRow5 = false;
+
         this.addAnnotation(annotationsRow1, 'sync', null, 0, 21);
         this.addAnnotation(annotationsRow1, 'data', null, 21, 87);
         this.addAnnotation(annotationsRow1, 'sync', null, 108, 21);
@@ -168,8 +173,9 @@ class TribbleComponent extends Component {
         const ft8MessageType = message.ft8MessageType;
         const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108);
 
-        if (annotationDefinitions[ft8MessageType]) {
-            annotationDefinitions[ft8MessageType].forEach(annotationDef => {
+        const defs = annotationDefinitions[ft8MessageType];
+        if (defs) {
+            defs.forEach(annotationDef => {
                 let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits);
 
                 const anno3_text = annotation.shortLabel ?? annotation.label ?? annotation.tag;
@@ -181,7 +187,20 @@ class TribbleComponent extends Component {
                 const anno4_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.long ?? annotation.value ?? annotation.short}\nRaw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})`;
         
                 this.addAnnotation(annotationsRow4, anno4_text, anno4_tooltip, 21 + annotation.start, annotation.length);
+                
+                // subdefinitons: used only for telemetry bytes right now
+                if (annotation.subdefs) {
+                    requireAnnotationsRow5 = true;
+                    annotation.subdefs.forEach(subdef => {
+                        const subanno = AnnotationDefGetAnnotation(subdef, payloadBits);
+                        const subanno_text = subanno.short ?? subanno.value ?? subanno.long;
+                        const subanno_tooltip = `${subanno.label ?? subanno.shortLabel ?? subanno.tag}\n${subanno.long ?? subanno.value ?? subanno.short}\nRaw bits (=integer): ${subanno.bits} (=${subanno.rawIntValue})`;
+                        console.log(subanno);
+                        this.addAnnotation(annotationsRow5, subanno_text, subanno_tooltip, 21 + subanno.start, subanno.length);
+                    });
+                }
             });
+            
         } else {
             console.warn(`No annotation definition for message type: ${ft8MessageType}`);
         }
@@ -190,6 +209,7 @@ class TribbleComponent extends Component {
         this.gridContainer.appendChild(annotationsRow2);
         this.gridContainer.appendChild(annotationsRow3);
         this.gridContainer.appendChild(annotationsRow4);
+        if (requireAnnotationsRow5) this.gridContainer.appendChild(annotationsRow5);
 
     }
 
@@ -233,7 +253,6 @@ class TribbleComponent extends Component {
         this.interval = setInterval(() => {
             this.frameUpdate();
         }, 50); // Update every 50ms
-
     }
 
     onStop() {

@@ -28,6 +28,7 @@ class OutputComponent extends Component {
         return {
             inputText: message.inputText,
             inputType: message.inputType,
+            inputTypeDescription: inputTypeDescriptions[message.inputType],
             ft8MessageType: message.ft8MessageType,
             messageTypeInfo: getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
@@ -225,7 +226,7 @@ class OutputComponent extends Component {
             <h2>${data.messageTypeInfo} (${data.ft8MessageType})</h2>
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
-                ${this.renderRowText('Input type', data.inputType)}
+                ${this.renderRowDataField( { label: 'Input type', value: data.inputType, subtype: data.inputTypeDescription })}
                 ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType }) : ''}
 
                 ${this.renderSubheading('Message Fields')}

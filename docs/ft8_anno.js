@@ -1,4 +1,4 @@
-const def_i3n3 = { label: "Message Type", tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
+const def_i3n3 = { label: "Message Type", shortLabel:'type', tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
 const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
 
 // note: don't use shortLabel if not needed to display on tribble bit display
@@ -34,12 +34,12 @@ const annotationDefinitions = {
         { label: "Call2", tag:'c28', start: 28, length: 28, getValue: bitsToCall },
         { label: "R", tag:'R1', start: 56, length: 1, getValue: (bit) => bit === '1' ? 'R' : '' },
         { label: "Number of transmitters", shortLabel: 'nTX', tag:'n4', start: 57, length: 4, getValue: bitsToTxDetails },
-        { label: "Class",  tag:'k3', start: 61, length: 3, getValue: (bits) => bitsToFieldDayClass(bits) },
-        { label: "Section", tag: 'S7', start: 64, length: 7, getValue: (bits) => bitsToARRLSection(bits) },
+        { label: "Class",  tag:'k3', start: 61, length: 3, getValue: bitsToFieldDayClass },
+        { label: "Section", tag: 'S7', start: 64, length: 7, getValue: bitsToARRLSection },
         def_i3n3
     ],
     "0.5": [ // Telemetry
-        { label: "Telemetry", tag: 't71', start: 0, length: 71, getValue: (bits) => telemetryBitsToText(bits) },
+        { label: "Telemetry", tag: 't71', start: 0, length: 71, getValue: telemetryBitsToText, subdefs: telemetryByteAnnotations() },
         def_i3n3
     ],
     "0.6": [ // undefined

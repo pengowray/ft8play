@@ -306,6 +306,14 @@ function symbolsToPrettyBinary(symbols) {
     return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
+function symbols58ToSymbols79(symbols) {
+    // adds missing costas
+    if (symbols.length !== 58) {
+        throw new Error("Invalid length (expected 58)");
+    }
+    return COSTAS_STR + symbols.slice(0, 29) + COSTAS_STR + symbols.slice(29, 58) + COSTAS_STR;
+}
+
  // z-base-32: permutation of the RFC3548 standard.
 const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
 const ZBASE32_Reverse = {};
@@ -738,20 +746,50 @@ function decodeFT8Telemetry(payload) {
   return telemetryHex;
 }
 
-function telemetryBitsToText(binaryStr) {
-    if (binaryStr.length !== 71) throw new Error("Telemetry must be 71 bits");
+function telemetryBitsToText(bits) {
+    if (bits.length !== 71) throw new Error("Telemetry must be 71 bits");
 
     // pad the start
-    binaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
+    bits = bits.padStart(Math.ceil(bits.length / 4) * 4, '0');
     
     let hexString = '';
-    for (let i = 0; i < binaryStr.length; i += 4) {
-        let fourBits = binaryStr.slice(i, i + 4);
+    for (let i = 0; i < bits.length; i += 4) {
+        let fourBits = bits.slice(i, i + 4);
         let hexDigit = parseInt(fourBits, 2).toString(16);
         hexString += hexDigit;
     }
 
     return hexString;
+}
+
+function telemetryBitsToByteText(bits) {
+    bits = bits.padStart(Math.ceil(bits.length / 4) * 4, '0');
+    
+    let hexString = '';
+    for (let i = 0; i < bits.length; i += 4) {
+        let fourBits = bits.slice(i, i + 4);
+        let hexDigit = parseInt(fourBits, 2).toString(16);
+        hexString += hexDigit;
+    }
+
+    hexString.padStart(2, '0');
+    return hexString;
+}
+
+function telemetryByteAnnotations() {
+    const skipOnFirst = 1;
+    const totalLen = 71;
+    let annotations = [];
+    let n = 0;
+    let len = 7; // skip first bit
+
+    for (let i = 0; i < totalLen; i += len) {
+        if (n==1) len = 8;
+        annotations.push( { label: `byte[${n}]`, start: i, length: len, getValue: telemetryBitsToByteText} );
+        n++;
+    }
+
+    return annotations;
 }
 
 function packedToHexStr(packedData) {

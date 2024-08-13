@@ -216,7 +216,7 @@ class VizComponent extends Component {
         this.interval = setInterval(() => {
             this.frameUpdate();
 
-        }, 23); // Update every 23ms
+        }, 16); // Update every 16ms
     }
 
 
