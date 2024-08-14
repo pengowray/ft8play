@@ -235,13 +235,13 @@ class OutputComponent extends Component {
                 ${this.renderSubheading('Encoding')}
 
                 ${this.renderChecks('Checks', data.checks)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Use 3140652.', null, '79 tones')}
+                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
                 ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Right padded.`, 'packed')}
                 ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
-                ${this.renderRowDataHighlights('CRC', data.crcBits, this.getCRCHighlights(data.crcCheck), null, null, '14 bits')}
-                ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated for the Message and CRC, it would differ in the above highlighted bits.', null, '83 bits')}
-                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Given the LPDC data, red highlighted bits are the most likely to be incorrect. Orange highlights are less likely errors. The 174-bits are the combined Message + CRC + LDPC.') : ''}
-                ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'Single step error repair using parity check data. May repair the message if there are a small number of errors. Copy this into the input and encode to see the result.', 'corrected') : ''  }
+                ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
+                ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'Low Density Parity Check (LDPC). The highlighted bits differ from parity data which would match the combined message and CRC bits.', null, '83 bits', 'Low Density Parity Check (LDPC)')}
+                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('Codeword', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Red highlighted bits are the most likely to be incorrect, considering the parity data. Orange highlighted bits are less likely errors. The 174 bits are the message, CRC and LDPC concatenated together.', null, '174-bit', 'The 174 bits are the concatenation of the message, CRC and LDPC.') : ''}
+                ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'This has changes applied to the codeword, applying a single-step error repair, based on the parity data. Copy this into the input and encode to see the result. If there are only a small number of errors, this may repair the message.', 'corrected', '*') : ''  }
                 
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
@@ -342,7 +342,7 @@ class OutputComponent extends Component {
         `;
     }
     
-    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null, secondaryLabel = null) {
+    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null, secondaryLabel = null, noHighlightComment = null) {
         let highlightedValue = value;
         //Array.isArray(highlightIndices)
         //highlightIndices instanceof Set
@@ -383,6 +383,7 @@ class OutputComponent extends Component {
                 <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
                 <div class="output-value output-data">${highlightedValue}</div>
                 ${hasHighlights && ifHighlightsComment ? `<div class="output-comment">${ifHighlightsComment}</div>` : ''}
+                ${!hasHighlights && noHighlightComment ? `<div class="output-comment">${noHighlightComment}</div>` : ''}
             </div>
         `;
 

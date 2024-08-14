@@ -930,7 +930,7 @@ function symbolsToPackedData(symbolsText) {
     packedData[i] = byte;
   }
   // debug:
-  console.log('symbolsText, messageBits, packedData', symbolsText, messageBits, packedData);
+  //console.log('symbolsText, messageBits, packedData', symbolsText, messageBits, packedData);
 
   return packedData;
 }
@@ -1317,21 +1317,40 @@ function bitsToGrid4OrReportDetails(bits) {
         const latlon = latLonForGrid(ret.value);
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
-            desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token.";
+            desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token, but here has been encoded as a location.";
             ret.subtype = 'Maidenhead locator*';
         }
         return { ...ret, ...latlon, desc };
         
     } else {
         const irpt = g15 - MAXGRID4;
-        const also = {rawAppend: `irpt: ${irpt}`};
+        const also = {rawAppend: `Overgrid: ${irpt}`};
+        //if (irpt === 0) return { value: '', subtype: 'unknown / reserved', subtype: 'special token', ...also}; // TODO: official meaning? lib_ft8 packs -35 dB to this.
         if (irpt === 1) return { value: '', subtype: 'blank', ...also};
-        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR means reception report received', ...also };
-        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73: report received and best regards', ...also };
-        if (irpt === 4) return { value: '73', subtype: 'special token', desc: "73 means 'best regards'", ...also };
+        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR is short for "reception report received"', ...also };
+        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73 is short for "report received and best regards"', ...also };
+        if (irpt === 4) return { value: '73', subtype: 'special token', desc: '73 is short for "best regards"', ...also };
 
         const value = (irpt - 35).toString();
-        return { value, subtype: 'signal report', units: 'dB', ...also };
+
+        //return { value, subtype: 'signal report', units: 'dB', ...also };
+        // in lib_ft8 -35 dB (irpt: 0) also works? probably a bug
+        // in (lib_ft8 v2.00): .\gen_ft8.exe "AA9GO VK3PGO R-31" "temp.wav" wraps to give '73' special token 
+        //  -32 gives 'RR73' special token // -62 gives RR73 maidenhead
+        // in ft8code.exe "aa9go vk3pgo R-31" gives 70 dB; Raw value: 111111011111001 (=32505) irpt: 105
+        // in ft8code (wsjtx), -35 dB gives (irpt: 101 or 66 dB) ft8code.exe "aa9go vk3pgo R-35" gives 66 dB
+
+        const minVal = -30;
+
+         //332: Raw value: 111111111111111 (=32767) irpt: 367; TODO: check spec and implementations if this is allowed or if higher dB numbers reserved
+         // 99 dB is highest you can enter with ft8_lib
+        // .\gen_ft8.exe "AA9GO VK3PGO R+100" "temp.wav" gives 10 dB (additional characters are truncated); '999' -> 99 dB
+        // unpacking with lib_ft8 gives odd output: R+332 becomes R+Q2
+        // in ft8code (wsjtx), ".\ft8code.exe "aa9go vk3pgo R+333" gives "*** bad message ***"" (correctly)
+        //322 example: 525a67b7104522bfffc8
+        const maxVal = 332;
+        
+        return { ...signalReportDetails(value, minVal, maxVal), ...also };
     }
 }
 
@@ -1340,9 +1359,92 @@ function bitsToReport(bits) {
 
     if (bits.length !== 5) throw new Error("Report must be 5 bits");
     const n = parseInt(bits, 2); // 0 to 31
-    const value = ((n * 2) - 30).toString();
-    return { value, subtype: 'signal report', units: 'dB' }; // desc: 'Possible values: –30 to +32 dB'
+    const value = ((n * 2) - 30);
+    //return { value, subtype: 'signal report', units: 'dB' }; // desc: 'Possible values: –30 to +32 dB'
+    return signalReportDetails(value, -30, 32);
+}
 
+function signalReportDetails(dbValue, min = null, max = null) {
+
+    function formatToSigFigs(num, sigFigs) {
+        if (num === 0) return '0';
+        const magnitude = Math.floor(Math.log10(Math.abs(num))) + 1;
+        const scale = Math.pow(10, sigFigs - magnitude);
+        if (num >= 1e21) { // For silly large numbers
+            const magnitude = Math.floor(Math.log10(num));
+            const rounded = Math.round(num / Math.pow(10, magnitude - sigFigs + 1)) * Math.pow(10, magnitude - sigFigs + 1);
+            return rounded.toLocaleString('fullwide', {useGrouping: true});
+        }
+
+        return (Math.round(num * scale) / scale).toString();
+    }
+
+    function formatNumber(num, sigFigs) {
+        if (num >= 1e6 || num <= 1e-4) {
+            const exponent = Math.floor(Math.log10(num) / 3) * 3;
+            const base = num / Math.pow(10, exponent);
+            return `${formatToSigFigs(base, sigFigs)}×10<sup>${exponent}</sup>`;
+        }
+        return formatToSigFigs(num, sigFigs);
+    }
+
+    let note = '';
+    if (min != null && dbValue == min) note = ', which is the minimum possible for this field';
+    if (max != null && dbValue == max) note = ', which is the maximum possible for this field';
+
+    let explain = ''
+    if (dbValue < 0) {
+        explain = `Signal is reported as ${Math.abs(dbValue)} dB below the noise floor${note}.`;
+    } else if (dbValue == 0) {
+        explain = `Signal is reported as being at the same level as the noise floor${note}.`;
+    } else {
+        explain = `Signal is reported as +${dbValue} dB above the noise floor${note}.`;
+    }
+
+    const powerRatio =  Math.pow(10, dbValue / 10); // calculatePowerRatioFromDb(dbValue);
+    
+    const ratioSignificantFigures = 2;
+    const expSignificantFigures = 2;
+
+    // Format the "x:1" or "1:y" ratio
+    let formattedRatio;
+    if (powerRatio >= 1) {
+      formattedRatio = formatToSigFigs(powerRatio, ratioSignificantFigures) + ':1';
+    } else {
+      formattedRatio = '1:' + formatToSigFigs(1 / powerRatio, ratioSignificantFigures);
+    }
+
+    // Format the power ratio
+    let formattedPowerRatio = formatNumber(powerRatio, expSignificantFigures);
+    let orScientific = (dbValue < 0 || formattedPowerRatio.includes('<sup>')) ? ` or ${formattedPowerRatio}` : '';
+
+    explain += ` Power ratio: <span title="${powerRatio}">${formattedRatio}${orScientific}</span>.`;
+
+    explain += '<br>The Signal to Noise Ratio (SNR) quoted for amateur radio modes is traditionally based on a receiver bandwidth of 2500 Hz.';
+
+    let subtype = 'signal report';
+
+    if (dbValue == 73) {
+        explain = "73 is short for 'best regards'. It can also be encoded with a special token, but here has been encoded as a signal report.<br>" 
+            + explain;
+        subtype += '*';
+        
+    } else if (dbValue == 88) {
+        explain = "88 is short for 'love and kisses', and here has been encoded as a signal report.<br>" 
+            + explain;
+        subtype += '*';
+    }
+
+    return { 
+        value: dbValue.toString(), 
+        subtype,
+        units: 'dB', 
+        descNoEsc: explain 
+    }
+}
+
+function calculatePowerRatioFromDb(dbValue) {
+    return Math.pow(10, dbValue / 10);
 }
 
 function bitsToR2(bits) { // aka bitsToRR73
