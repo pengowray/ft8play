@@ -39,6 +39,7 @@ To transmit FT8 farther than the bluetooth speaker connected to your phone you'l
 
 ## What things are in the UI
 
+- Callsign hashes are displayed with Z-Base-32 encoding for easy conversion between 22, 12 and 10 bit hashes. The possible characters are: `ybndrfg8ejkmcpqxot1uwisza345h769`. The middle digit can be any of `ybnd`. Zero `0` is not valid Z-Base-32 and is used to mean 'unknown'.
 - Base Frequency (default 500 Hz). FT8 audio output will range from the base frequency to about 50 Hz above it. 1000 Hz is sometimes used as the default base frequency for certain applications, but 500 Hz is the default because it made for more pleasant listening while developing this.
 - Sample Rate: the number of audio samples per second in your generated audio signal. 12000 Hz is the default. 44100 Hz is CD quality. If you set the base frequency to more than about half the sample rate, you'll get fun aliasing effects.
 - "Play at Next 15s Slot" is an awkwardly named button which waits until the next FT8 window begins before playing audio. It's based on your device's clock. Please drop a message or a pull request if you know javascript and have a way of getting a precise time from somewhere on the internet (ala [time.is](https://time.is/)), or if you have an idea for a more consise name for this button.
