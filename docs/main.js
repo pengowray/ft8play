@@ -80,7 +80,9 @@ function initializeUI() {
             option.value = `ft8codeMsg ${index}`;
             option.textContent = `(${test.type}) ${test.message}`;
             testSelect.appendChild(option);
+        });
 
+        testInputs_ft8code.forEach((test, index) => {
             const option2 = document.createElement('option');
             option2.value = `ft8codeSymbols ${index}`;
             option2.textContent = `(${test.type}) ${test.message} (unpack)`;

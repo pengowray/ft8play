@@ -39,7 +39,7 @@ To transmit FT8 farther than the bluetooth speaker connected to your phone you'l
 
 ## What things are in the UI
 
-- Callsign hashes are displayed with Z-Base-32 encoding for easy conversion between 22, 12 and 10 bit hashes. The possible characters are: `ybndrfg8ejkmcpqxot1uwisza345h769`. The middle digit can be any of `ybnd`. Zero `0` is not valid Z-Base-32 and is used to mean 'unknown'.
+- Callsign hashes are displayed with Z-Base-32 encoding for easy conversion between 22, 12 and 10 bit hashes. The possible characters are: `ybndrfg8ejkmcpqxot1uwisza345h769`. The middle digit can be any of `ybnd`. Zero `0` is not valid Z-Base-32 and is used to mean 'unknown'. The part of the hash which is included in the field is underlined.
 - Base Frequency (default 500 Hz). FT8 audio output will range from the base frequency to about 50 Hz above it. 1000 Hz is sometimes used as the default base frequency for certain applications, but 500 Hz is the default because it made for more pleasant listening while developing this.
 - Sample Rate: the number of audio samples per second in your generated audio signal. 12000 Hz is the default. 44100 Hz is CD quality. If you set the base frequency to more than about half the sample rate, you'll get fun aliasing effects.
 - "Play at Next 15s Slot" is an awkwardly named button which waits until the next FT8 window begins before playing audio. It's based on your device's clock. Please drop a message or a pull request if you know javascript and have a way of getting a precise time from somewhere on the internet (ala [time.is](https://time.is/)), or if you have an idea for a more consise name for this button.
@@ -77,10 +77,11 @@ Payload/symbol input formats: (for debugging or advanced uses)
 
 ## Thanks
 
-Software libraries used:
+Software libraries and data sources used:
  - [ft8_lib](https://github.com/kgoba/ft8_lib) (MIT) — which I've [forked to add emscripten (wasm) support](https://github.com/pengowray/ft8_lib/tree/ft8_wasm)
  - [D3 javascript library](https://d3js.org/)
  - [HamGridSquare.js](https://gist.github.com/stephenhouser/4ad8c1878165fc7125cb547431a2bdaa) (MIT) by Paul Brewer KI6CQ
+ - [AD1C's _Contest Country Files_](https://www.country-files.com/contest/) ft8play includes `CTY.CSV` <!-- (same format as Aether/KLog) -->to show the country of a callsign.
 
 ## Privacy
 - All processing is done on your local machine or device. Your input is not sent anywhere.

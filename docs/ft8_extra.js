@@ -4,8 +4,6 @@ const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 // Costas array for sync
 const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
 const COSTAS_STR = '3140652';
-// CRC polynomial
-const CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
 
 const FTX_PAYLOAD_LENGTH_BYTES = 10;
 const FT8_NN = 79; // Total channel symbols
@@ -459,11 +457,11 @@ function checkSync(symbols) {
     };
 }
 
-const FT8_CRC_WIDTH = 14;
-const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
-const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
-
 function ftx_compute_crc(message, num_bits) {
+    const FT8_CRC_WIDTH = 14;
+    const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
+    const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
+
     let remainder = 0;
     let idx_byte = 0;
 
@@ -488,17 +486,17 @@ function ftx_compute_crc(message, num_bits) {
 
 function checkCRC(symbols) {
     let bitString = symbolsToBitsStrNoCosta(symbols);
-    let message = bitString.slice(0, 77).padEnd(82, '0').split('').map(Number);
+    let msgBits = bitString.slice(0, 77).padEnd(82, '0').split('').map(Number);
     
     // Convert bit array to byte array
     let messageBytes = [];
     for (let i = 0; i < 82; i += 8) {
-        messageBytes.push(parseInt(message.slice(i, i + 8).join(''), 2));
+        messageBytes.push(parseInt(msgBits.slice(i, i + 8).join(''), 2));
     }
     
     let calculatedCRC = ftx_compute_crc(messageBytes, 82);
     let receivedCRC = parseInt(bitString.slice(77, 91), 2);
-    
+
     return {
         crc: calculatedCRC.toString(2).padStart(14, '0'),
         received: receivedCRC.toString(2).padStart(14, '0'),
@@ -801,7 +799,6 @@ function packedToHexStrSp(packedData) {
 }
 
 function bitsToHexForTelemetry(binaryStr) {
-
     // Pad the binary string to ensure its length is a multiple of 4
     // not sure if it should be start or end?
     binaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
@@ -816,6 +813,7 @@ function bitsToHexForTelemetry(binaryStr) {
     return hexString;
 }
 
+
 function bitsToHex(binaryStr) {
     // Pad the binary string to ensure its length is a multiple of 4
     binaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
@@ -828,6 +826,11 @@ function bitsToHex(binaryStr) {
     }
     
     return hexString;
+}
+
+
+function bitsToPacked(bitString) {
+    return new Uint8Array(bitsToHex(normalizeBinary(bitString)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 }
 
 // Helper function to convert hex string to binary string
@@ -1038,7 +1041,7 @@ function getFT8MessageTypeName(type) {
         case "0.3": return "Field Day";
         case "0.4": return "Field Day";
         case "0.5": return "Telemetry";
-        case "0.6": return "Unknown / Reserved";
+        case "0.6": return "WSPR";
         case "0.7": return "Unknown / Reserved";
         case "1": return "Standard message";
         case "2": return "EU VHF";
@@ -1060,7 +1063,7 @@ function bitsToCall(bits) {
     return  bitsToCallDetails(bits);
     
     //const details = bitsToCallDetails(bits);
-    return `${details.callsign} (${details.type})`;
+    //return `${details.callsign} (${details.type})`;
 }
 
 const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
@@ -1076,6 +1079,7 @@ function hashCallsign(callsign) {
     for (let i = 0; i < maxLength; i++) {
         const j = nchar(callsign[i], FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
         if (j < 0) {
+            console.error("Invalid character in callsign: " + callsign[i]);
             return null; // hash error (wrong character set)
         }
         n58 = (BigInt(38) * n58) + BigInt(j);
@@ -1151,8 +1155,12 @@ function bitsToCallDetails(bits, extraBit = "") {
         //result.details.hashValue = hashValue
         //result.callsign = "<...>";
         const subBits = hashValue.toString(2).padStart(22, '0');
-        result.value = hashBitsPrettyZ32(subBits);
-        result.rawAppend = `Hash22: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
+        result.isHash = true;
+        result.hashBits = subBits;
+        result.hashLen = 22;
+        result.value = hashBitsPrettyZ32(subBits); // for bit viz display
+
+        //result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
 
         const matchDetails = hashMatchDetails(subBits);
         if (matchDetails) result = {...result, ...matchDetails};
@@ -1164,7 +1172,7 @@ function bitsToCallDetails(bits, extraBit = "") {
         let c = n - NTOKENS - MAX22;
 
         const subBits = c.toString(2).padStart(22, '0');
-        result.rawAppend = `Call22: ${subBits} (=${bitsToBigIntString(subBits)})`;
+        result.rawAppend = `22-bit call: ${subBits} (=${bitsToBigIntString(subBits)})`;
 
         // Decode last 3 characters (from right to left)
         let suffix = '';
@@ -1206,30 +1214,55 @@ function bitsToCallDetails(bits, extraBit = "") {
             result.details.specialPrefix = 'Q';
             result.subtype = 'Q code / callsign';
         }
-        const hashed = callsignToHashBits(result.value)
-        result.hashed = hashed;
-        //result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)} (${hashBitsPretty(hashed)} =${hashBits22styleBase10(hashed)})</span>`;
-        result.descNoEsc = `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`;
+
+        const country = callsignToCountry(result.value);
+        result.country = country;
         
+        const hashBits = callsignToHashBits(result.value)
+        result.hashBits = hashBits;
+        result.hashLen = hashBits?.length; // 22
+        result.isHash = false;
+
+        result.callsign = result.value;
     }
 
     return result;
 }
 
+function callsignToCountry(call) {
+    if (typeof cty !== 'undefined' && cty) {
+        const countryDetails = cty.getCountryDetails(call);
+        if (countryDetails) {
+            return countryDetails.country;
+        }
+    }
+    return null;
+}
+
+function callsignToCountryDetails(call) {
+    if (typeof cty !== 'undefined' && cty) {
+        const countryDetails = cty.getCountryDetails(call);
+        return countryDetails;
+    }
+    return null;
+}
+
+
 function hashMatchDetails(bits) {
     const match = findHash(bits);
     if (match) {
         let result = {};
+        //result.isHash = true; // shouldn't be needed
         result.hashMatch = match;
-        if (bits.length == 22) {
-            result.desc = `Hash matches ${match.callsign}`;
-        } else {
-            //`Hash matches ${match.callsign} (${match.zhash})`;
-            result.descNoEsc = `Hash matches ${escapeHTML(match.callsign)} <span title="${hashBitsTo22styleBase10(match.hashInt)}">(${match.zhash})</span>`;
-        }
-        result.unhashed = match.callsign;
+        result.hashBits = match.hashBits // give full bits in case only had parital
+        result.hashLen = bits.length; // should be done already by caller, but make sure it's set to original length for underlining
+        result.actualHashBits = bits; // save old value
+
+        result.callsign = match.callsign;
         if (match.callsign == '') result.unhashed = '(blank)';
         
+        result.country = callsignToCountry(match.callsign);
+
         return result;
     }
     return null;
@@ -1244,13 +1277,12 @@ function isGrid4(grid) {
 }
 
 function bitsToHash(bits) {
-    //return hashBitsPrettyHex(bits);
-    const hashed = hashBitsPrettyZ32(bits);
 
     const matchDetails = hashMatchDetails(bits) ?? {};
 
     // desc: 'Displayed in Z-Base32 encoding'
-    return { ...matchDetails, value: hashed, subtype:'hash' + bits.length };
+    //note: hashBits may be overriden by matchDetails.hashBits, which will have the full 22 bits if a match is found
+    return { hashBits: bits, value: hashBitsPrettyZ32(bits), ...matchDetails, isHash: true, hashLen: bits.length, subtype:'hash' + bits.length };
 }
 
 
@@ -1318,7 +1350,12 @@ function bitsToGrid4OrReportDetails(bits) {
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
             desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token, but here has been encoded as a location.";
-            ret.subtype = 'Maidenhead locator*';
+            ret.subtype += '*';
+        } else if (ret.value == 'RG58') {
+            desc += "\nRG-58/U is a type of coaxial cable often used for low-power signal and RF connections."
+        } else if (ret.value == 'FB73') {
+            desc += "\nFB in amateur radio slang means 'fine business' or 'excellent', which combines with '73' for 'best regards'. FB73 is in Antarctica.";
+            ret.subtype += '*';
         }
         return { ...ret, ...latlon, desc };
         
@@ -1331,16 +1368,25 @@ function bitsToGrid4OrReportDetails(bits) {
         if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73 is short for "report received and best regards"', ...also };
         if (irpt === 4) return { value: '73', subtype: 'special token', desc: '73 is short for "best regards"', ...also };
 
-        const value = (irpt - 35).toString();
+        //let value = (irpt - 35);
+        //if (value >= 50) value -= 101; // db over 50 is wrapped negative
+        const value = (irpt >= 85) ? (irpt - 136) : (irpt - 35);
+
+        // irpt 5 to 84: regular: -30 to 49 dB; (irpt-35 db)
+        if (irpt >= 85) also.unhashed = 'low signal'; // -51 to -29 dB (irpt-136 db) -- if treated like regular, would be 50 to 72 dB
+        if (irpt >= 106) also.unhashed = 'ambiguous'; // -30 to 49 dB again (irpt-136 db) -- if treated like regular, would be 73 to 150 dB
+        if (irpt >= 207) also.unhashed = 'very high'; // 50 to 231 dB -- if treated like regular, would be 151 to 332 dB
 
         //return { value, subtype: 'signal report', units: 'dB', ...also };
         // in lib_ft8 -35 dB (irpt: 0) also works? probably a bug
         // in (lib_ft8 v2.00): .\gen_ft8.exe "AA9GO VK3PGO R-31" "temp.wav" wraps to give '73' special token 
-        //  -32 gives 'RR73' special token // -62 gives RR73 maidenhead
-        // in ft8code.exe "aa9go vk3pgo R-31" gives 70 dB; Raw value: 111111011111001 (=32505) irpt: 105
+        // way out of range: -32 gives 'RR73' special token // -62 gives RR73 maidenhead
+        // [fixed in ft8play] in ft8code.exe "aa9go vk3pgo R-31" gives 70 dB; Raw value: 111111011111001 (=32505) irpt: 105 -- should give -31 dB; 
+
         // in ft8code (wsjtx), -35 dB gives (irpt: 101 or 66 dB) ft8code.exe "aa9go vk3pgo R-35" gives 66 dB
 
-        const minVal = -30;
+        //const minVal = -30; // only the lowest value before the smaller lowest values
+        const minVal = -51;  // 50 - 101
 
          //332: Raw value: 111111111111111 (=32767) irpt: 367; TODO: check spec and implementations if this is allowed or if higher dB numbers reserved
          // 99 dB is highest you can enter with ft8_lib
@@ -1348,7 +1394,8 @@ function bitsToGrid4OrReportDetails(bits) {
         // unpacking with lib_ft8 gives odd output: R+332 becomes R+Q2
         // in ft8code (wsjtx), ".\ft8code.exe "aa9go vk3pgo R+333" gives "*** bad message ***"" (correctly)
         //322 example: 525a67b7104522bfffc8
-        const maxVal = 332;
+        const maxVal = 49;
+        //const maxVal = 332;
         
         return { ...signalReportDetails(value, minVal, maxVal), ...also };
     }
@@ -1420,7 +1467,7 @@ function signalReportDetails(dbValue, min = null, max = null) {
 
     explain += ` Power ratio: <span title="${powerRatio}">${formattedRatio}${orScientific}</span>.`;
 
-    explain += '<br>The Signal to Noise Ratio (SNR) quoted for amateur radio modes is traditionally based on a receiver bandwidth of 2500 Hz.';
+    explain += '<br>The Signal to Noise Ratio (SNR) quoted for amateur radio modes is traditionally based on a receiver bandwidth of 2500 Hz, a far wider noise bandwidth than is required to successfully demodulate and decode the message.';
 
     let subtype = 'signal report';
 
@@ -1428,7 +1475,7 @@ function signalReportDetails(dbValue, min = null, max = null) {
         explain = "73 is short for 'best regards'. It can also be encoded with a special token, but here has been encoded as a signal report.<br>" 
             + explain;
         subtype += '*';
-        
+
     } else if (dbValue == 88) {
         explain = "88 is short for 'love and kisses', and here has been encoded as a signal report.<br>" 
             + explain;
@@ -1462,13 +1509,16 @@ function bitsToR2(bits) { // aka bitsToRR73
 
 function bitsToNonstandardCallDetails(bits, message) {
     const callsign = bitsToNonstandardCall(bits);
-    const hashed = callsignToHashBits(callsign);
+    const hashBits = callsignToHashBits(callsign);
+    const country = callsignToCountry(callsign);
 
     return { 
-        value: callsign, 
+        callsign, 
+        value: callsign,
         subtype: 'non-standard callsign',
-        hashed: hashed,
-        descNoEsc: `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`
+        hashBits,
+        isHash: false,
+        country,
     };
 }
 
@@ -1505,6 +1555,22 @@ function bitsToARRLSection(bits) {
         return `Section ${n}`;
     }
     return ARRL_SEC[i];
+}
+
+function bitsToTxDetailsLow(bits) {
+    // n4 Number of transmitters: 1-16
+    if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
+    const n = parseInt(bits, 2);
+    const low = `${n + 1}`;
+    return { value: low, subtype: 'transmitter(s)'};
+}
+
+function bitsToTxDetailsHigh(bits) {
+    // n4 Number of transmitters: 17-32
+    if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
+    const n = parseInt(bits, 2);
+    const high = `${n + 17}`;
+    return { value: high, subtype: 'transmitter(s)'};
 }
 
 function bitsToTxDetails(bits) {
@@ -1572,3 +1638,32 @@ function addStrings(num1, num2) {
 
     return result;
 }
+
+function addUnderlineToHash(hashBits, numBitsToUnderline, classname = "call-highlighter") {
+    if (hashBits == null || hashBits.length == 0) return '';
+
+    const zhash = hashBitsPrettyZ32(hashBits);
+    if (numBitsToUnderline == null ||  numBitsToUnderline == 0) return zhash;
+
+    let bitLen = numBitsToUnderline ?? hashBits?.length ?? 0;
+    let uLen = zhash.length;
+    //if (bitLen == 22) underlineLen = 6;
+    if (bitLen == 12) uLen = 4;
+    if (bitLen == 10) uLen = 2;
+
+    return addSpanToStart(zhash, uLen, classname);
+}
+
+//utility for underlining text
+function addSpanToStart(str, charCount, classname) {
+    if (charCount <= 0) {
+      return str;
+    }
+
+    const len = charCount > str.lengt ? str.length : charCount;
+    
+    const spanContent = str.slice(0, len);
+    const remainder = str.slice(len);
+    
+    return `<span class="${classname}">${spanContent}</span>${remainder}`;
+  }

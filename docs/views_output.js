@@ -226,8 +226,8 @@ class OutputComponent extends Component {
             <h2>${data.messageTypeInfo} (${data.ft8MessageType})</h2>
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
-                ${this.renderRowDataField( { label: 'Input type', value: data.inputType, subtype: data.inputTypeDescription })}
-                ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType }) : ''}
+                ${this.renderRowDataField( { label: 'Input type', value: data.inputType, subtype: data.inputTypeDescription, isField: false })}
+                ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType, isField: false }) : ''}
 
                 ${this.renderSubheading('Message Fields')}
                 ${this.renderRows(data.messageBits, data.ft8MessageType)}
@@ -236,7 +236,7 @@ class OutputComponent extends Component {
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
-                ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Right padded.`, 'packed')}
+                ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Zero-extended to 10 bytes.`, 'packed')}
                 ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
                 ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
                 ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'Low Density Parity Check (LDPC). The highlighted bits differ from parity data which would match the combined message and CRC bits.', null, '83 bits', 'Low Density Parity Check (LDPC)')}
@@ -246,7 +246,8 @@ class OutputComponent extends Component {
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
-                ${this.renderRowData('Decoded text', data.decodedText, data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null)}
+                ${this.renderRowDataField({label: 'Decoded text', value: data.decodedText, desc: data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null })}
+
                 ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "Please check if individual message fields were were decoded.") : ''}
 
                 ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
@@ -307,7 +308,7 @@ class OutputComponent extends Component {
         `;
     }
     renderRowDataField(fieldData) {
-        const {
+        let {
             label,
             secondaryLabel,
             tag,
@@ -321,24 +322,43 @@ class OutputComponent extends Component {
             length,
             comment,
             units,
-            unhashed,
-            rawAppend
+            callsign,
+            hashBits,
+            hashLen,
+            isHash, // focus on hash not call
+            operatingStatusIndicator, // e.g. /R or /P indicated elsewehre
+            country,
+            rawAppend,
+            isField = true, // Field within the data. If rendering something else e.g "Input type", set to false (for smaller font), or lie and say true to make something else big like "Decoded text"
+
         } = fieldData;
     
         //todo:
         //const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
 
+        const zhash = (hashBits && hashBits.length > 0) ? hashBitsPrettyZ32(hashBits) : null;
+        const hashIntStr = (hashBits && hashBits.length == 22) ? hashBitsTo22styleBase10(hashBits) : null;
+
         //todo: less hackish escapeHTML toggle
+        let valueText = '';
+        if (callsign || zhash) {
+            //const boldifyCall = true; // !isHash; // turn off hash highlighting for now
+            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
+            if (country) { valueText += `<div class="output-country gravity-low">${escapeHTML(country)}</div>`; }
+        } else {
+            valueText = `<span class="output-data ${isField ? 'output-field' : ''}">${escapeHTML(value)}</span>`;
+        }
 
         return `
             <div class="output-row">
-                <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
-                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ unhashed ? `<span class="output-unhashed"> ${unhashed}</span>` : '' }` 
+                <div class="output-label">${label}${secondaryLabel ? ` <span class="output-sublabel">${secondaryLabel}` : ''}</span></div>` 
+                + `<div class="output-value">${valueText}${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }`
                 + `${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}` 
-                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }</div>`
+                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }`  +
+               `</div>`
                 + `${desc ? `<div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>` : ''}` 
                 + `${descNoEsc ? `<div class="output-comment">${descNoEsc}</div>` : ''}
-            </div>
+           </div>
         `;
     }
     

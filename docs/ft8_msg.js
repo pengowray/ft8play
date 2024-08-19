@@ -36,7 +36,7 @@ function findHash(bits) {
     if (zhash in hashes) {
         const entry = hashes[zhash];
         const entryBits = entry[0].toString(2).padStart(22, '0');
-        return {hashInt: entry[0], callsign: entry[1], zhash: hashBitsPrettyZ32(entryBits)};
+        return {hashInt: entry[0], callsign: entry[1], hashBits: entryBits};
     }
     return null;
 }
@@ -213,7 +213,15 @@ class FT8Message extends EventTarget {
                 this.packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 break;
             case '77 bits':
-                this.packedData = new Uint8Array(bitsToHexForTelemetry(normalizeBinary(input)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                this.packedData = new bitsToPacked(input);
+                break;
+            case '82 bits':
+                const bitStr = normalizeBinary(input);
+                const zeroPadding = bitStr.slice(77);
+                if (zeroPadding != '00000') {
+                    this.encodeError = "Invalid 82-bit message: not zero padded. (Expected 77 bits + 5 zeros)";
+                }
+                this.packedData = bitsToPacked(bitStr);;
                 break;
             case '91 bits':
                 this.symbolsText = binary91ToSymbols(normalizeBinary(input));
@@ -235,9 +243,7 @@ class FT8Message extends EventTarget {
                 const packingResult = messageToPackedData(input);
 
                 if (packingResult.success) {
-                    console.log("Packed data:", packingResult);
                     this.packedData = packingResult.data;
-                    
                     
                 } else {
                     this.encodeError_ft8lib = `Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`;
@@ -451,8 +457,6 @@ class FT8Message extends EventTarget {
         if (this.symbolsText == null) return;
 
         const symbolsArray = symbolsToArray(this.symbolsText); // .split('').map(Number)
-        console.log("symbols", this.symbolsText, symbolsArray);
-        console.log("options", options);
 
         const numSymbols = symbolsArray.length; // 79
         
@@ -612,6 +616,8 @@ function doDetectInputType(inputOriginal) {
     if (/^[0-1]+$/.test(normBinary)) {
         if (normBinary.length === 77) {
             return '77 bits'; // Source-encoded message, 77 bits
+        } else if (normBinary.length === 82) { // 77 bits + 5 bits zero padding
+            return '82 bits'; 
         } else if (normBinary.length === 91) { // 77 + 14 bits
             return '91 bits';
         } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
@@ -659,12 +665,13 @@ function findMinAndMax(numbers) {
 
 const inputTypeDescriptions = {
     '77 bits': 'Payload data',
+    '82 bits': 'Payload data + five zero bits padding',
     '91 bits': 'Payload + CRC',
     '174 bits': 'Payload + CRC + LDPC',
     '237 bits': 'All symbols mapped to regular binary tribbles',
     '237 grits': 'All symbols as graycode triplets',
     '58 symbols': 'FSK tone data without sync tones',
     '79 symbols': 'Full FSK tone data',
-    'packed': 'Payload as hexadecimal (right padded)',
+    'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
     'default': 'FT8 message text',
 };

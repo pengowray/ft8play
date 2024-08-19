@@ -3,7 +3,8 @@
     --text-color: #333333;
     --text-color-comment: #666;
     --text-color-tertiary: #338265;
-    --text-color-unhashed:#b0b0b0;
+    --text-color-gravity-medium:#434343;
+    --text-color-gravity-low:#787878;
     
     --input-bg: #f0f0f0;
     --button-bg: #4CAF50;
@@ -25,7 +26,8 @@
     --text-color: #f0f0f0;
     --text-color-comment: #999;
     --text-color-tertiary: #81c1a9;
-    --text-color-unhashed: #545454;
+    --text-color-gravity-medium: #bbb;
+    --text-color-gravity-low:#aaa;
 
     --input-bg: #444444;
     --button-bg: #45a049;
@@ -35,7 +37,7 @@
     --warning-text: orange;
 
     --position-line-color: white;
-    --costas-bg: rgb(8, 78, 255);
+    --costas-bg: rgb(26, 90, 253);
     --costas-bg-bits: rgb(33, 59, 125);
     --data-bg: #837e94;
     --ramp-bg: #333333;
@@ -54,6 +56,42 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 
+.montserrat-call {
+    font-family: "Montserrat", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 800;
+    font-style: normal;
+}
+
+.righteous-regular {
+    font-family: "Righteous", "McLaren", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+  }
+  
+.atkinson-hyperlegible-regular {
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+}
+
+.atkinson-hyperlegible-bold {
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-weight: 700;
+    font-style: normal;
+}
+
+.atkinson-hyperlegible-regular-italic {
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-weight: 400;
+    font-style: italic;
+}
+
+.atkinson-hyperlegible-bold-italic {
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-weight: 700;
+    font-style: italic;
+}
 h1, h2 {
     text-align: center;
 }
@@ -582,9 +620,8 @@ body:not(.dark-mode) #piano-roll {
     word-break: normal;
 }
 
-
 .output-label {
-    font-weight: bold;
+    /* font-weight: bold; */
     margin-bottom: 2px;
     padding: 5px 0;
 }
@@ -595,10 +632,60 @@ body:not(.dark-mode) #piano-roll {
     border-radius: 4px;
 }
 
-.output-data { /* modifies .output-value */
+
+.output-data {
     font-family: monospace;
     white-space: pre-wrap;
-    word-break: break-all;
+    /* word-break: break-all; */
+}
+
+
+.output-field,
+.output-call {
+    font-size: 1.1em;
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 700;
+    font-style: normal;
+    letter-spacing: 0.05em;
+    padding-right: 8px;
+}
+
+.output-hash {
+    font-size: 0.8em;
+    letter-spacing: 0.06em;
+    font-family: "Righteous", "McLaren", "IBM Plex Serif", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+}
+
+.call-highlighter { /* modifies .output-call and .output-hash */
+    text-decoration: underline;
+    text-decoration-color: var(--text-color-tertiary);
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.4em;
+    text-decoration-skip-ink: none;
+}
+
+.gravity-high {
+    color: var(--text-color);
+}
+.gravity-medium {
+    color: var(--text-color-gravity-medium);
+}
+.gravity-low {
+    color: var(--text-color-gravity-low);
+}
+
+.output-country {
+    font-size: 0.8em;
+    font-family: "Montserrat", "Roboto", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.02em;
+    padding-right: 8px;
+    font-variant-caps: all-small-caps;
 }
 
 .checks {
@@ -703,25 +790,11 @@ body:not(.dark-mode) #piano-roll {
     color: #666;
     margin-top: 2px;
     grid-column: 2;
-    padding-left: 5px;
 }
 
 .dark-mode .output-comment {
     color: #5e5e5e;
 }
-
-.output-unhashed {
-    font-size: 0.9em;
-    padding-left: 5px;
-    font-weight: bold;
-    font-style: italic;
-    color: var(--text-color-unhashed);
-}
-
-.dark-mode .output-unhashed {
-    color: var(--text-color-unhashed);
-}
-
 
 .highlighted-corrected {
     background-color: #ccffcc;
