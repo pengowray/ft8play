@@ -1159,8 +1159,7 @@ function bitsToCallDetails(bits, extraBit = "") {
         result.hashBits = subBits;
         result.hashLen = 22;
         result.value = hashBitsPrettyZ32(subBits); // for bit viz display
-
-        //result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
+        result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
 
         const matchDetails = hashMatchDetails(subBits);
         if (matchDetails) result = {...result, ...matchDetails};
