@@ -632,13 +632,12 @@ body:not(.dark-mode) #piano-roll {
     border-radius: 4px;
 }
 
-
 .output-data {
     font-family: monospace;
-    white-space: pre-wrap;
-    /* word-break: break-all; */
+    white-space: pre-wrap;  /* todo */
+    /* white-space: break-spaces;  TODO */ 
+    word-break: break-all;
 }
-
 
 .output-field,
 .output-call {
@@ -649,6 +648,7 @@ body:not(.dark-mode) #piano-roll {
     font-style: normal;
     letter-spacing: 0.05em;
     padding-right: 8px;
+    
 }
 
 .output-hash {

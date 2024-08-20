@@ -179,9 +179,16 @@ class FT8Message extends EventTarget {
         return this.inputType;
     }
 
+    globalInputNormalization(input) {
+        // any input types we shouldn't normalize in all the ways?
+        // TODO: normalize unicode numbers / strip diacritics / etc
+        return input.trim().toUpperCase().replace(/\s+/g, ' ').replace('Ø', '0');
+    }
+
     encode() {
 
         let input = this.inputText;
+        input = this.globalInputNormalization(input);
         const inputType = this.inputType ?? this.detectInputType();
 
         //let packedData, symbolsText;
