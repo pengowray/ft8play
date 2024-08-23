@@ -2015,31 +2015,13 @@ var ___wasm_call_ctors = Module["___wasm_call_ctors"] = createExportWrapper("__w
 var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 
 /** @type {function(...*):?} */
-var _processSymbols = Module["_processSymbols"] = createExportWrapper("processSymbols");
-
-/** @type {function(...*):?} */
-var _calculate_num_samples = Module["_calculate_num_samples"] = createExportWrapper("calculate_num_samples");
-
-/** @type {function(...*):?} */
-var _synth_gfsk = Module["_synth_gfsk"] = createExportWrapper("synth_gfsk");
-
-/** @type {function(...*):?} */
-var _processPackedHexStr = Module["_processPackedHexStr"] = createExportWrapper("processPackedHexStr");
+var _decodeFT8PackedData = Module["_decodeFT8PackedData"] = createExportWrapper("decodeFT8PackedData");
 
 /** @type {function(...*):?} */
 var _free = Module["_free"] = createExportWrapper("free");
 
 /** @type {function(...*):?} */
-var _decodeFT8Symbols = Module["_decodeFT8Symbols"] = createExportWrapper("decodeFT8Symbols");
-
-/** @type {function(...*):?} */
-var _decodeFT8PackedData = Module["_decodeFT8PackedData"] = createExportWrapper("decodeFT8PackedData");
-
-/** @type {function(...*):?} */
 var _freeFT8DecodeResult = Module["_freeFT8DecodeResult"] = createExportWrapper("freeFT8DecodeResult");
-
-/** @type {function(...*):?} */
-var _encodeFT8 = Module["_encodeFT8"] = createExportWrapper("encodeFT8");
 
 /** @type {function(...*):?} */
 var _freeFT8Result = Module["_freeFT8Result"] = createExportWrapper("freeFT8Result");
@@ -2049,6 +2031,9 @@ var _encodeFT8_packed = Module["_encodeFT8_packed"] = createExportWrapper("encod
 
 /** @type {function(...*):?} */
 var _encodeFT8_audio = Module["_encodeFT8_audio"] = createExportWrapper("encodeFT8_audio");
+
+/** @type {function(...*):?} */
+var _calculate_num_samples = Module["_calculate_num_samples"] = createExportWrapper("calculate_num_samples");
 
 /** @type {function(...*):?} */
 var _encodeFT8Message = Module["_encodeFT8Message"] = createExportWrapper("encodeFT8Message");
@@ -2066,10 +2051,10 @@ var _packedToSymbols = Module["_packedToSymbols"] = createExportWrapper("packedT
 var _symbolsToAudio = Module["_symbolsToAudio"] = createExportWrapper("symbolsToAudio");
 
 /** @type {function(...*):?} */
-var _decodeFT8 = Module["_decodeFT8"] = createExportWrapper("decodeFT8");
+var _synth_gfsk_custom = Module["_synth_gfsk_custom"] = createExportWrapper("synth_gfsk_custom");
 
 /** @type {function(...*):?} */
-var _synth_gfsk_custom = Module["_synth_gfsk_custom"] = createExportWrapper("synth_gfsk_custom");
+var _decodeFT8 = Module["_decodeFT8"] = createExportWrapper("decodeFT8");
 
 /** @type {function(...*):?} */
 var ___errno_location = Module["___errno_location"] = createExportWrapper("__errno_location");

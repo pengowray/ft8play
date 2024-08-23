@@ -104,7 +104,7 @@ class CTYData {
           //tidy country name
           const tidyCountry = TidyCountry(currentCountry.country);
           currentCountry.country = tidyCountry;
-          this.countries.push([currentCountry.country, tidyCountry]); // for debug
+          //this.countries.push([currentCountry.country, tidyCountry]); // for debug
 
           this.countryData.push(currentCountry);
         } else if (currentCountry) {
@@ -208,4 +208,4 @@ class CTYData {
 
 const cty = new CTYData();
 cty.loadData();
-console.log('countries', cty.countries);
+//console.log('countries', cty.countries);

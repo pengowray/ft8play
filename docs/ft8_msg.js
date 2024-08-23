@@ -100,6 +100,10 @@ class FT8Message extends EventTarget {
       this.symbolPeriod = null; // 0.160
       //this.numOfSymbols = null; // 79 (todo)
 
+      this.audioSamples = null;
+      this.dphiSamples = null;
+      this.levelsSamples = null;
+
       // for playing
       this.isPlaying = false; // == (audioSource != null)
       this.playStartTime = null;
@@ -271,7 +275,8 @@ class FT8Message extends EventTarget {
         }
 
         if (this.symbolsText == null && this.packedData != null) {
-            this.symbolsText = packedDataToSymbols(this.packedData);
+            this.symbolsText = packedDataToSymbolsArray(this.packedData);
+
         } else if (this.packedData == null && this.symbolsText != null) {
             //console.log("empty packed data, generating from symbols");
             this.packedData = symbolsToPackedData(this.symbolsText);
@@ -288,7 +293,7 @@ class FT8Message extends EventTarget {
         }
     
         this.ft8MessageType = getFT8MessageType(this.packedData);
-        this.reDecodedResult = decodeFT8PackedData(this.packedData, this.packedData.length);
+        this.reDecodedResult = decodeFT8FromPackedData(this.packedData, this.packedData.length);
 
         if (this.expectedResults) {
             if (this.expectedResults?.decoded) addHashesFromInput(this.expectedResults.decoded);
@@ -307,6 +312,7 @@ class FT8Message extends EventTarget {
     clearAudioData() {
         this.audioSamples = null;
         this.dphiSamples = null;
+        this.levelsSamples = null;
         //this.metadata = null;
         this.audioBuffer = null;
         this.channelData = null;
@@ -459,69 +465,77 @@ class FT8Message extends EventTarget {
     updates this.audioSamples, this.dphiSamples, this.metadata
     */
     generateAudio() {
-        // was generateAudioFromSymbols(symbols, options = {}) 
         const options = this.getOptions();
         if (this.symbolsText == null) return;
-
-        const symbolsArray = symbolsToArray(this.symbolsText); // .split('').map(Number)
-
-        const numSymbols = symbolsArray.length; // 79
+    
+        const numSymbols = this.symbolsText.length;
         
-        // Allocate memory for symbols
-        const symbolsPtr = Module._malloc(numSymbols);
-        Module.HEAPU8.set(symbolsArray, symbolsPtr);
+        // Allocate memory for symbols string
+        //const symbolsPtr = Module.stringToUTF8(this.symbolsText);
+        const symbolsPtr = Module._malloc(numSymbols + 1); // +1 for null terminator
+        for (let i = 0; i < numSymbols; i++) {
+            Module.HEAP8[symbolsPtr + i] = this.symbolsText.charCodeAt(i);
+        }
+        Module.HEAP8[symbolsPtr + numSymbols] = 0; // Null terminator
 
         // Calculate number of samples
         let numSamples = Module._calculate_num_samples(numSymbols, options.symbolPeriod, options.sampleRate);
-
+    
         // Allocate memory for audio and dphi
         const audioPtr = Module._malloc(numSamples * 4);
         const dphiPtr = Module._malloc(numSamples * 4);
+        const levelsPtr = Module._malloc(numSamples * 4);
 
         // Allocate memory for metadata
         const metadataLengthPtr = Module._malloc(4);
         const metadataJsonPtrPtr = Module._malloc(4);
         const FT8_TONE_COUNT = 8;
-
+    
         let result;
-        //options.customToneFrequencies = null; // test
-
+        const n_start_delay = 0;  // Set to 0 for now
+        const n_end_extension = 0;  // Set to 0 for now
+    
         if (options.customToneFrequencies != null) {
             // Use custom tone frequencies
             const toneOffsetsPtr = Module._malloc(FT8_TONE_COUNT * 4);
             const toneOffsets = new Float32Array(Module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
             for (let i = 0; i < FT8_TONE_COUNT; i++) {
-                toneOffsets[i] = options.customToneFrequencies[i]; // - baseFrequency;
+                toneOffsets[i] = options.customToneFrequencies[i];
             }
-
+    
             result = Module._synth_gfsk_custom(
-                symbolsPtr, numSymbols, options.baseFrequency, toneOffsetsPtr,
+                symbolsPtr, options.baseFrequency, toneOffsetsPtr,
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
-                audioPtr, dphiPtr, metadataLengthPtr, metadataJsonPtrPtr
+                n_start_delay, n_end_extension,
+                audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
             );
-
+    
             Module._free(toneOffsetsPtr);
         } else {
             // Use default FT8 frequencies
-            result = Module._synth_gfsk(
-                symbolsPtr, numSymbols, options.baseFrequency,
+            result = Module._synth_gfsk_custom(
+                symbolsPtr, options.baseFrequency, 0, // Pass 0 for custom_tones when using default
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
-                audioPtr, dphiPtr, metadataLengthPtr, metadataJsonPtrPtr
+                n_start_delay, n_end_extension,
+                audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
             );
         }
-
+    
         const audio = new Float32Array(Module.HEAPF32.buffer, audioPtr, numSamples);
         const dphi = new Float32Array(Module.HEAPF32.buffer, dphiPtr, numSamples);
+        const levels = new Float32Array(Module.HEAPF32.buffer, levelsPtr, numSamples);
         this.audioSamples = Array.from(audio);
-
+    
         const dphiArray = Array.from(dphi);
-        this.dphiSamples = scaleToRange(dphiArray, 190, 10); // fit in 0 to 200 (and flip) for visualization
+        this.dphiSamples = scaleToRange(dphiArray, 190, 10);
+
+        const levelsArray = Array.from(levels);
+        this.levelsSamples = scaleToRange(levelsArray, 195, 5);
 
         const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
         const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
         const metadataStr = Module.UTF8ToString(metadataJsonPtr, metadataLength);
-        //console.log(metadataStr);
-
+    
         try {
             this.metadata = JSON.parse(metadataStr);
         } catch {
@@ -532,13 +546,14 @@ class FT8Message extends EventTarget {
             Module._free(symbolsPtr);
             Module._free(audioPtr);
             Module._free(dphiPtr);
+            Module._free(levelsPtr);
             Module._free(metadataLengthPtr);
             Module._free(metadataJsonPtrPtr);
             Module._free(metadataJsonPtr);
         }
     }
-  }
-  
+}
+
 function detectTelemetry(str) {
     //exactly 18 hex digits, or start with T:
     //note: first digit must be 0-8 if 18 digits. (not checked here)
@@ -653,6 +668,7 @@ function doDetectInputType(inputOriginal) {
  */
 function scaleToRange(numbers, newMin, newMax) {
     const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
+    console.log("min/max:", originalMin, originalMax);
     const scale = (newMax - newMin) / (originalMax - originalMin);
     
     return numbers.map(num => (num - originalMin) * scale + newMin);

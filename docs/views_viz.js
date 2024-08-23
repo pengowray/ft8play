@@ -114,6 +114,8 @@ class VizComponent extends Component {
         const zoomLevel = mode['zoom'];
 
         const data = showDphi ? message.dphiSamples : message.audioSamples;
+        const levelsData = showDphi ? message.levelsSamples : null;
+
         if (!data || data.length === 0) {
             console.error(`No ${showDphi ? 'dphi samples' : 'audio samples'} to draw`);
             return;
@@ -126,7 +128,7 @@ class VizComponent extends Component {
         let endTime = currentTime + visibleDuration / 2;
 
         // Adjust start and end times to prevent showing blank areas
-        if (startTime < 0) {
+        if (startTime <= 0) {
             startTime = 0;
             endTime = visibleDuration;
         } else if (endTime > totalDuration) {
@@ -164,27 +166,35 @@ class VizComponent extends Component {
                 }
             }
         }
-        ctx.beginPath();
-        ctx.moveTo(0, middle);
+        const doDraw = (dat, isPrescaled, color) => {
+            ctx.beginPath();
+            ctx.moveTo(0, middle);
 
-        let lastX = -1;
-        for (let sample = startSample; sample <= endSample; sample++) {
-            if (sample >= 0 && sample < data.length) {
-                const x = Math.floor((sample - startSample) / samplesPerPixel);
-                if (x !== lastX) {
-                    let y;
-                    if (showDphi) {
-                        y = data[sample]; // pre-scaled
-                    } else {
-                        y = middle + (data[sample] * middle * 0.9);
+            let lastX = -1;
+            for (let sample = startSample; sample <= endSample; sample++) {
+                if (sample >= 0 && sample < dat.length) {
+                    const x = Math.floor((sample - startSample) / samplesPerPixel);
+                    if (x !== lastX) {
+                        let y;
+                        if (isPrescaled) {
+                            y = dat[sample]; // pre-scaled
+                        } else {
+                            y = middle + (dat[sample] * middle * 0.9);
+                        }
+                        ctx.lineTo(x, y);
+                        lastX = x;
                     }
-                    ctx.lineTo(x, y);
-                    lastX = x;
                 }
             }
+            ctx.strokeStyle = color;
+            ctx.stroke();
         }
-        ctx.strokeStyle = showDphi ? 'green' : 'steelblue';
-        ctx.stroke();
+        if (showDphi) {
+            doDraw(levelsData, true, 'gray');
+            doDraw(data, true, 'green');
+        } else {
+            doDraw(data, false, 'steelblue');
+        }
 
         if (this.message.isPlaying) {
             // Draw playback position line
