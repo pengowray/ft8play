@@ -224,15 +224,18 @@ class FT8Message extends EventTarget {
                 this.packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 break;
             case '77 bits':
-                this.packedData = new bitsToPacked(input);
+                input = normalizePackedData(input);
+                this.packedData = bitsToPacked(input);
                 break;
+            case '80 bits':
             case '82 bits':
                 const bitStr = normalizeBinary(input);
                 const zeroPadding = bitStr.slice(77);
-                if (zeroPadding != '00000') {
-                    this.encodeError = "Invalid 82-bit message: not zero padded. (Expected 77 bits + 5 zeros)";
+                if (zeroPadding != '000' && zeroPadding != '00000') {
+                    this.encodeError = `Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr}`;
+                    throw new Error(this.encodeError);
                 }
-                this.packedData = bitsToPacked(bitStr);;
+                this.packedData = bitsToPacked(bitStr.slice(0, 77));
                 break;
             case '91 bits':
                 this.symbolsText = binary91ToSymbols(normalizeBinary(input));
@@ -244,7 +247,7 @@ class FT8Message extends EventTarget {
                 this.symbolsText = binary237ToSymbols(normalizeBinary(input));
                 break;
             case '237 grits': // symbols (as graycode bits, including sync)
-                this.symbolsText = grayBitsToSymbols(input);
+                this.symbolsText = grayBitsToSymbols(normalizeBinary(input));
                 break;
             case 'default':
             default:
@@ -292,6 +295,15 @@ class FT8Message extends EventTarget {
             throw new Error(this.encodeError);
         }
     
+        if (this.packedData) {
+            var packedBits = packedDataTo80Bits(this.packedData);
+            const zeroPadding = packedBits.slice(77);
+            if (zeroPadding != '000') {
+                this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
+                throw new Error(this.encodeError);
+            }
+        }
+
         this.ft8MessageType = getFT8MessageType(this.packedData);
         this.reDecodedResult = decodeFT8FromPackedData(this.packedData, this.packedData.length);
 
@@ -638,8 +650,8 @@ function doDetectInputType(inputOriginal) {
     if (/^[0-1]+$/.test(normBinary)) {
         if (normBinary.length === 77) {
             return '77 bits'; // Source-encoded message, 77 bits
-        } else if (normBinary.length === 82) { // 77 bits + 5 bits zero padding
-            return '82 bits'; 
+        } else if (normBinary.length === 80) { // 77 bits + 3 bits zero padding
+            return '80 bits'; 
         } else if (normBinary.length === 91) { // 77 + 14 bits
             return '91 bits';
         } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
@@ -688,11 +700,12 @@ function findMinAndMax(numbers) {
 
 const inputTypeDescriptions = {
     '77 bits': 'Payload data',
-    '82 bits': 'Payload data + five zero bits padding',
+    '80 bits': 'Payload data, extended with three zero bits',
+    '82 bits': 'Payload data, extended with five zero bits', // input to CRC calculations, according to FT4_FT8_QEX.pdf paper
     '91 bits': 'Payload + CRC',
     '174 bits': 'Payload + CRC + LDPC',
     '237 bits': 'All symbols mapped to regular binary tribbles',
-    '237 grits': 'All symbols as graycode triplets',
+    '237 grits': 'All symbols as their graycode triplets',
     '58 symbols': 'FSK tone data without sync tones',
     '79 symbols': 'Full FSK tone data',
     'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's

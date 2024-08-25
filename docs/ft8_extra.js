@@ -799,6 +799,13 @@ function packedToHexStrSp(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
 }
 
+function packedDataTo80Bits(packedData) {
+    if (packedData.length !== 10) {
+        throw new Error("Invalid packed data: must be a Uint8Array of length 10");
+    }
+    return Array.from(packedData).map(b => b.toString(2).padStart(8, '0')).join('');
+}
+
 function bitsToHexForTelemetry(binaryStr) {
     // Pad the binary string to ensure its length is a multiple of 4
     // not sure if it should be start or end?
@@ -831,7 +838,12 @@ function bitsToHex(binaryStr) {
 
 
 function bitsToPacked(bitString) {
-    return new Uint8Array(bitsToHex(normalizeBinary(bitString)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+    if (bitString.length != 80 && bitString.length != 77) {
+        throw new Error("Invalid length to pack: must be 77 or 80 bits");
+    }
+    const bits = normalizeBinary(bitString).padEnd(80, '0');
+
+    return Uint8Array.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
 }
 
 // Helper function to convert hex string to binary string
@@ -1251,7 +1263,7 @@ function bitsToGrid4OrReportDetails(bits) {
         if (irpt === 4) return { value: '73', subtype: 'special token', desc: '73 is short for "best regards"', ...also };
 
         //let value = (irpt - 35);
-        //if (value >= 50) value -= 101; // db over 50 is wrapped negative
+        //if (value >= 50) value -= 101; // db over 50 is folded negative
         const value = (irpt >= 85) ? (irpt - 136) : (irpt - 35);
 
         // irpt 5 to 84: regular: -30 to 49 dB; (irpt-35 db)
@@ -1276,8 +1288,10 @@ function bitsToGrid4OrReportDetails(bits) {
         // unpacking with lib_ft8 gives odd output: R+332 becomes R+Q2
         // in ft8code (wsjtx), ".\ft8code.exe "aa9go vk3pgo R+333" gives "*** bad message ***"" (correctly)
         //322 example: 525a67b7104522bfffc8
-        const maxVal = 49;
-        //const maxVal = 332;
+
+        //const maxVal = 49; // ought to be the max
+        //const maxVal = 332; // max if ignore the fold
+        const maxVal = 231;
         
         return { ...signalReportDetails(value, minVal, maxVal), ...also };
     }
