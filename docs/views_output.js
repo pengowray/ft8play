@@ -290,7 +290,7 @@ class OutputComponent extends Component {
                 const note = `Raw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})\nPosition in payload: ${pos}`;
         
                 //rowContent += this.renderRowData(label, text, note);
-                rowContent += this.renderRowDataField( {...annotation, value: text, label, secondaryLabel, comment: 'comment example'} );
+                rowContent += this.renderRowDataField( {...annotation, value: text, label, secondaryLabel} );
             });
         } else {
             console.warn(`No annotation definition for message type: ${ft8MessageType}`);
@@ -330,6 +330,9 @@ class OutputComponent extends Component {
             country,
             rawAppend,
             isField = true, // Field within the data. If rendering something else e.g "Input type", set to false (for smaller font), or lie and say true to make something else big like "Decoded text"
+            isFlag,
+            on,
+            off,
 
         } = fieldData;
     
@@ -346,7 +349,15 @@ class OutputComponent extends Component {
             valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
             if (country) { valueText += `<div class="output-country gravity-low">${escapeHTML(country)}</div>`; }
         } else {
-            valueText = `<span class="output-data ${isField ? 'output-field' : ''}">${escapeHTML(value)}</span>`;
+            if (isFlag) { 
+                valueText = `${this.makeSwitch(bits === '1', off, on)}`;
+
+            } else if (bits == '0' || bits == '1') {
+                //valueText = `<span class="output-data>${this.makeSwitch(bits === '1', '0', '1')}</span>`;
+                valueText = `${this.makeSwitch(bits === '1', '0', '1')}`;
+            } else {
+                valueText = `<span class="output-data ${isField ? 'output-field' : ''}">${escapeHTML(value)}</span>`;
+            }
         }
 
         return `
@@ -541,6 +552,19 @@ class OutputComponent extends Component {
 
         return parityCheck.result === 'error' ? 
             analysis : [];
+    }
+
+    makeSwitch(isOn, OffLabel = '0', OnLabel = '1', isDisabled = true) {
+        return `
+            <div class="toggle-switch toggle-switch${isDisabled ? '--disabled' : ''}">
+                <span class="toggle-switch__label ${!isOn ? 'gravity-high' : 'gravity-low'}">${OffLabel}</span>
+                <label class="toggle-switch__track">
+                    <input type="checkbox" class="toggle-switch__input" ${isOn ? 'checked' : ''} disabled>
+                    <span class="toggle-switch__slider"></span>
+                </label>
+                <span class="toggle-switch__label ${isOn ? 'gravity-high' : 'gravity-low'}">${OnLabel}</span>
+            </div>
+        `;
     }
 }
 

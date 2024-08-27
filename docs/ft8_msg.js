@@ -652,6 +652,8 @@ function doDetectInputType(inputOriginal) {
             return '77 bits'; // Source-encoded message, 77 bits
         } else if (normBinary.length === 80) { // 77 bits + 3 bits zero padding
             return '80 bits'; 
+        } else if (normBinary.length === 82) { // 77 bits + 5 bits zero padding (as used as input to CRC)
+            return '82 bits'; 
         } else if (normBinary.length === 91) { // 77 + 14 bits
             return '91 bits';
         } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
