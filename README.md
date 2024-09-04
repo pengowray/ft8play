@@ -81,7 +81,7 @@ Software libraries and data sources used:
  - [ft8_lib](https://github.com/kgoba/ft8_lib) (MIT) — which I've [forked to add emscripten (wasm) support](https://github.com/pengowray/ft8_lib/tree/ft8_wasm)
  - [D3 javascript library](https://d3js.org/) ([ISC](https://github.com/d3/d3/blob/main/LICENSE))
  - [HamGridSquare.js](https://gist.github.com/stephenhouser/4ad8c1878165fc7125cb547431a2bdaa) (MIT) by Paul Brewer KI6CQ
- - [AD1C's _Contest Country Files_](https://www.country-files.com/contest/) (unknown license) — ft8play includes `CTY.CSV` <!-- (same format as Aether/KLog) -->to show the country of a callsign.
+ - [AD1C's _Contest Country Files_](https://www.country-files.com/contest/) (MIT) — ft8play includes `CTY.CSV` <!-- (same format as Aether/KLog) -->to show the country of a callsign.
 
 ## Privacy
 - All processing is done on your local machine or device. Your input is not sent anywhere.
