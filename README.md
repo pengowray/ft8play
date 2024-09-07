@@ -4,7 +4,7 @@
 
 I made this webpage which will pack text into an FT8 message and let you explore the resulting data, signals and audio. It's an experiment in information design, a way to learn about FT8, a tool to test and debug FT8 software, and if you're an amateur radio operator, you can use it to better understand what you're transmitting and receiving. It's also something I can point to and say 'I made this'.
 
-Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. Everything runs locally in a web page (it doesn't send inputs anywhere). The source code is plain javascript. It supports most FT8 message types with complete breakdowns of every field.
+Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. Everything runs locally in a web page (it doesn't send inputs anywhere). The majority of the source code is plain Javascript. It supports most FT8 message types with complete breakdowns of every field.
 
 I don't have plans to add audio decoding at this stage, though I do keep pondering the idea of building a full QSO-capable app that would run on a web browser on your phone, and connect to a radio through web serial.
 
@@ -70,6 +70,7 @@ Payload/symbol input formats: (for debugging or advanced uses)
 - [X] have suggestions for alternative encoding methods when available
 - [ ] save the user's call and grid in a cookie if they like
 - [ ] optimizations
+- [ ] update MSHV to latest + better test coverage for Qt string replacement code
 - [ ] FFT visualization
 - [ ] lots of other things, but it's largely working and has the basics, so I'm happy to leave it as is for now.
 
