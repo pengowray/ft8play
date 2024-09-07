@@ -82,9 +82,9 @@ Software libraries and data sources used:
  - [D3 javascript library](https://d3js.org/) ([ISC](https://github.com/d3/d3/blob/main/LICENSE))
  - [HamGridSquare.js](https://gist.github.com/stephenhouser/4ad8c1878165fc7125cb547431a2bdaa) (MIT) by Paul Brewer KI6CQ
  - [AD1C's _Contest Country Files_](https://www.country-files.com/contest/) (MIT) — ft8play includes `CTY.CSV` <!-- (same format as Aether/KLog) -->to show the country of a callsign.
- - WSJT-X (GPLv3) — the original FT8 software by Joe Taylor K1JT and Steve Franke, K9AN. Although not used directly in this project, I have referenced the Fortran source, as have the authors of MSHV and FT8_lib. WSJT-X is the most widely used FT8 software and the reference implementation of the FT8 protocol.
+ - WSJT / WSJT-X (GPLv3) — the original FT8 software. Although not used directly in this project, I have referenced the Fortran source, as have the authors of MSHV and FT8_lib. WSJT-X is the most widely used FT8 software and is considered the reference implementation of the FT8 protocol.
  
- Thank you to the authors and contributors of these libraries and data sources, who have collectively made this project possible.
+Thank you to the authors and contributors of these libraries and data sources—Joe Taylor K1JT and Steve Franke K9AN, who developed the FT8 protocol and WSJT-X, Karlis Goba YL3JG who created ft8_lib, Christo LZ2HV who ported WSJTX to C++ and develops MSHV, Jim Reisert AD1C who maintains the Amateur Radio Country Files, and the many other contributors who have collectively made this project possible.
 
 ## How to contribute
 
@@ -92,9 +92,9 @@ Software libraries and data sources used:
    - [ ] The 'explainer', which explains the meaning of QSO text in plain English, could be expanded to cover more cases. It's a lot of if-then-else statements. The code is simple and easy to follow. It's in `ft8_explain.js`. Find QSOs where the explainer doesn't make sense and add a new case.
    - [ ] If you're more into audio visual stuff, you could try to add a spectrogram or waterfall display of the audio. See `views_viz.js`; [wavesurfer.js](https://wavesurfer.xyz/example/spectrogram/?scroll) looks good.
    - [ ] Or try to work out what kind of .wav files WSJT-X is expecting from file > open.
-   - [ ] Have you noticed this is just another to do list in second person?
    - [ ] If you're more of a mathematical or puzzle person, you could try porting or creating a solver for LDPC errors, and adding an interface to let ther user add a tab with the corrected message. So far there's a solver which attempts a single step of flipping the most wrong-looking bits.
-   - [ ] If you're interested in information design, you could try designing and implementing a visualization of the graycode to binary conversion process in the blocks of bits data view that I should probably label with a better name. The challenge is to make it difficult for the viewer to glance at the diagram and confuse the gray code for binary code.
+   - [ ] Have you noticed this is just a to do list in second person?
+   - [ ] If you're interested in information design, you could try designing and implementing a visualization of the graycode to binary conversion process in the blocks of bits data view that I should probably label with a better name. The challenge is to add gray code (the values of the symbols), so that when glancing at the diagram it is difficult to confuse the gray code and binary code.
    - [ ] If you want to force this tool to be something actually useful, you could try adding a way to decode FT8 audio.
    - [ ] If you're into messing with javascript, find a nice way to make the browser back button work within the tool, and make a url format for sharing messages.
    - [ ] If you're a developer of amateur radio software, learn to use [Git](https://en.wikipedia.org/wiki/Git).
