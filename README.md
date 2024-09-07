@@ -105,8 +105,11 @@ Software libraries and data sources used:
 - All processing is done on your local machine or device. Your input is not sent anywhere.
 
 ## Licensing notes
-- Other than that from MSHV, all code is MIT licensed or similar. MSHV is GPLv3 (as is the WSJT-X code it is based on). If you reuse this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then your project can be MIT licensed.
-- My wrappers and additions to the MSHV code are also MIT licensed.
+- This project is Copyright 2024 Pengo Wray. It is dual licensed under GPLv3 and additionally, if used without the MSHV module, under [MIT](https://github.com/pengowray/ft8play/blob/main/LICENSE).
+- All code is MIT licensed with the exceptions of the D3.js library, which uses the MIT-like [ISC](https://github.com/d3/d3/blob/main/LICENSE); and the MSHV-based code, which is licensed under GPLv3 (as is the WSJT/WSJT-X code it is based on).
+- My wrapper code and additions to the MSHV code are also dual MIT and GPLv3 licensed ([github link](https://github.com/pengowray/MSHV/tree/wasm/wasm))
+- My additions to [ft8_lib](https://github.com/kgoba/ft8_lib), are MIT licensed, like the original ([github link](https://github.com/pengowray/ft8_lib/tree/wasm/wasm))
+- If you fork this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then you can follow the more relaxed MIT licensing.
 - If you fork this project, do not use my name or callsigns in the fork's name without permission, but do link back to this project.
 
 ## Where can I use VK3PGO's FT8 Player? 
