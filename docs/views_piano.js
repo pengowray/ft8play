@@ -1,4 +1,6 @@
-class PianoRollComponent extends Component {
+import { Component } from './views.js';
+
+export class PianoRollComponent extends Component {
     create() {
         //this.container = document.container.getElementById('piano-roll');
         //window.addEventListener('resize', this.handleResize);
@@ -69,8 +71,6 @@ class PianoRollComponent extends Component {
     }
 
     onPlay() {
-        console.log('piano playing');
-
         if (this.message == null) return;
 
         this.message.readyAudioAndBuffer();
@@ -169,3 +169,4 @@ class PianoRollComponent extends Component {
 
 }
 
+//export default PianoRollComponent;

@@ -249,7 +249,7 @@ function testGridSquare() {
 	return totalPassed===l;
 };
 
-HamGridSquare = {
+const HamGridSquare = {
 	latLonForGrid: latLonForGrid,
 	gridForLatLon: gridForLatLon,
   	toLatLon: gridSquareToLatLon,
@@ -258,3 +258,6 @@ HamGridSquare = {
 };
 
 //testGridSquare();
+
+export { HamGridSquare } ;
+//export { gridForLatLon, latLonToGridSquare, latLonForGrid, gridSquareToLatLon, testGridSquare }

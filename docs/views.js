@@ -26,8 +26,8 @@ class ViewManager {
             (component !== null && (
                 component.index === messageIndex
                 || component.index == -2 // -2 for all messages
-                || (messageIndex === -1 && component.index === currentIndex) // -1 for current message
-                || (component.index === -1 && messageIndex === currentIndex))));
+                || (messageIndex === -99 && component.index === currentIndex) // -99 for current message
+                || (component.index === -99 && messageIndex === currentIndex))));
     }
 
     frameUpdate() {
@@ -40,7 +40,7 @@ class ViewManager {
 
     addMessage(message) {
         const index = this.messageManager.addMessage(message);
-        message.viewManager = this;
+        if (message != null) message.viewManager = this;
 
         //this.messageManager.switchToMessage(index);
         return index;
@@ -83,16 +83,16 @@ class ViewManager {
         });
     }
 
-    switchToMessageIndex(index) {
+    switchToMessageIndex(index) { // -1 for none; [-99 for current which is meaningless in this context]
         const oldMessage = this.messageManager.getCurrentMessage();
         this.messageManager.switchToMessageIndex(index);
         const message = this.messageManager.getMessage(index);
 
         this.getComponents(index).forEach((component) => {
-            component.loadMessage(message);
+            component.loadMessage(message); // sets .message and calls messageUpdate()
         });
 
-        if (message.isPlaying) {
+        if (message != null && message.isPlaying) {
             // pass
         } else {
             this.getComponents(index).forEach((component) => {
@@ -100,7 +100,7 @@ class ViewManager {
             });
         }
 
-        if (oldMessage != null && oldMessage != message && !oldMessage.isPlaying && !oldMessage.queuingStartedAt) {
+        if (oldMessage != null && (message == null || oldMessage != message) && !oldMessage.isPlaying && !oldMessage.queuingStartedAt) {
             // todo: check again once old message has stopped playing
             this.deleteMessage(oldMessage);
         }
@@ -118,7 +118,7 @@ class ViewManager {
 
     playCurrentMessageAudio() {
         //const index = this.messageManager.currentMessageIndex;
-        this.playAudioIndex(-1);
+        this.playAudioIndex(-99);
     }
 
     playAudioIndex(index) {
@@ -147,6 +147,7 @@ class ViewManager {
 
 
 class MessageManager {
+    
     constructor() {
         this.messages = [];
         this.currentMessageIndex = -1;
@@ -157,7 +158,14 @@ class MessageManager {
      * @returns {number} index
      */
     addMessage(message) {
-        //const message = new FT8Message(inputText);
+        if (message == null) return -1;
+        
+        const existingIndex = this.messages.indexOf(message);
+        if (existingIndex >= 0) {
+            //this.currentMessageIndex = existingIndex;
+            return existingIndex;
+        }
+
         this.messages.push(message);
         const index = this.messages.length - 1;
         //this.currentMessageIndex = index;
@@ -168,7 +176,7 @@ class MessageManager {
      * @returns {FT8Message}
      */
     getCurrentMessage() {
-        if (this.currentMessageIndex === -1) {
+        if (this.currentMessageIndex < 0) {
             return null;
         } else {
             return this.messages[this.currentMessageIndex];
@@ -180,13 +188,14 @@ class MessageManager {
     }
 
     deleteMessage(oldMessage) {
+        let deletedAny = false;
         for (let i = 0; i < this.messages.length; i++) {
             if (this.messages[i] === oldMessage) {
                 this.messages[i] = null;
-                return true;
+                deletedAny = true;
             }
         }
-        return false;
+        return deletedAny;
     }
 
     /**
@@ -194,8 +203,12 @@ class MessageManager {
      * @returns {FT8Message}
      */
     getMessage(index) {
-        if (index === -1) {
+        if (index === -99) { // current message
             return this.getCurrentMessage();
+        } else if  (index == -2) { // "all messages"; but asking for only one
+            return this.getCurrentMessage();
+        } else if (index < 0) {
+            return null;
         } else {
             return this.messages[index];
         }
@@ -225,8 +238,10 @@ class MessageManager {
         if (index >= 0 && index < this.messages.length) {
             this.currentMessageIndex = index;
             return this.getCurrentMessage();
+        } else {
+            this.currentMessageIndex = -1;
+            return null;
         }
-        return null;
     }
 
     deleteMessage(index) {
@@ -254,12 +269,14 @@ class Component {
     }
 
     loadMessage() {
+        //console.log("loadMessage() called on", this.constructor.name);
         this.message = this.messageManager.getMessage(this.index);
         this.messageUpdate();
     }
 
     loadMessage(message) {
         // called after creation or when message data changes
+        //console.log("loadMessage(message) called on", this.constructor.name);
         this.message = message;
         this.messageUpdate();
     }
@@ -293,3 +310,5 @@ class Component {
         }
     }
 }
+
+export { ViewManager, Component, MessageManager };

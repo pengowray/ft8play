@@ -1,3 +1,4 @@
+import { Component } from './views.js';
 
 const showModes = [ 
     //{name: "Off", "mode": "off", "zoom": 1}, 
@@ -7,7 +8,7 @@ const showModes = [
     {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
 ];
 
-class VizComponent extends Component {
+export class VizComponent extends Component {
 
     constructor(index, container) {        
         super(index, container);
@@ -240,4 +241,3 @@ class VizComponent extends Component {
     }
 
 }
-

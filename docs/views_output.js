@@ -1,7 +1,13 @@
+import { Component } from './views.js';
+import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName }  from './ft8_extra.js';
+import * as extra from "./ft8_extra.js";
+import { explainFT8Message } from './ft8_explain.js';
+import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
+
 const REFERENCE = 'expected';
 const DECODED = 'found';
 
-class OutputComponent extends Component {
+export class OutputComponent extends Component {
     create() {
     }
     
@@ -17,6 +23,10 @@ class OutputComponent extends Component {
 
     prepareOutputData() {
         const message = this.message;
+        if (!message || message.symbolsText == null || message.symbolsText == '') {
+            //console.log("nothing to output (OutputComponent)");
+            return null;
+        }
         const bitsNoCosta = symbolsToBitsStrNoCosta(message.symbolsText);
         
         //move me
@@ -30,15 +40,20 @@ class OutputComponent extends Component {
             inputType: message.inputType,
             inputTypeDescription: inputTypeDescriptions[message.inputType],
             ft8MessageType: message.ft8MessageType,
-            messageTypeInfo: getFT8MessageTypeName(message.ft8MessageType),
+            messageTypeInfo: extra.getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
-            decodedText: message.reDecodedResult.decodedText,
+            decodedText: message.bestDecodedResult?.success ? message.bestDecodedResult?.decodedText : '',
+            decodedText_ft8lib: message.ft8libDecodedResult?.decodedText,
+            decodedText_mshv: message.mshvDecodedResult?.success ? message.mshvDecodedResult?.decodedText : '',
+            ft8libDecodedResult: message.ft8libDecodedResult,
+            mshvDecodedResult: message.mshvDecodedResult,
             symbols: message.symbolsText,
-            packed: packedToHexStrSp(message.packedData),
-            veryPacked: packedToHexStr(message.packedData),
+            packed: extra.packedToHexStrSp(message.packedData),
+            veryPacked: extra.packedToHexStr(message.packedData),
             codeword: bitsNoCosta, // 174 bits
-            messageBits: bitsNoCosta.slice(0, 77),
+            messageBits: message.bits,
+            allBits: message.allBits,
             crcBits: bitsNoCosta.slice(77, 91),            
             parityBits: bitsNoCosta.slice(91),
             symbols: message.symbolsText,
@@ -46,10 +61,9 @@ class OutputComponent extends Component {
             crcCheck: message.getCRCCheck(),
             parityCheck: message.getParityCheck(),
             checks: this.prepareChecks(),
-            explanation: this.message.reDecodedResult.success ? 
-                explainFT8Message(this.message.reDecodedResult.decodedText, this.message.ft8MessageType) : 
+            explanation: this.message.bestDecodedResult?.success ? 
+                explainFT8Message(this.message.bestDecodedResult.decodedText, this.message.ft8MessageType) : 
                 null,
-            encodeError: message.encodeError_ft8lib,
             tests: this.prepareTests(),
             repaired: message.getParityRepairedCodeword(),
             testType,
@@ -58,6 +72,7 @@ class OutputComponent extends Component {
     }
 
     prepareChecks() {
+        if (!this.message || this.packetType != 'ft8') return null;
         return [
             { name: "Sync check", ...this.message.getSyncCheck() },
             { name: "CRC check", ...this.message.getCRCCheck() },
@@ -67,16 +82,23 @@ class OutputComponent extends Component {
     }
 
     prepareDecodedInfo() {
-        const decodeResult = this.message.reDecodedResult;
+        //TODO: try both decoders
+
+        const decodeResult = this.message.bestDecodedResult;
+        if (decodeResult == null) {
+            return [ { error: true, result: 'error', message: 'No decode result' } ];
+        }
+
         const decodeTest1 = { name: "decode", ...decodeResult };
         if (!decodeResult.success) {
             //return { error: true, result: 'error', message: `${decodeResult.errorCode}: ${decodeResult.errorMessage}` };
             return [ decodeTest1 ];
-        } else {
-            decodeTest1.resultText = 'success';
         }
 
-        const decoded = decodeResult.decodedText;
+        decodeTest1.resultText = 'success';
+        decodeTest1.result = 'ok';
+
+        const decoded = decodeResult?.decodedText;
         const originalInput = this.message.inputText;
         const inputType = this.message.inputType;
 
@@ -86,7 +108,7 @@ class OutputComponent extends Component {
             resultText: 'unchecked',
         };
         
-        if (inputType === 'default') {
+        if (inputType.startsWith('default')) {
             decodeTest2.result = 'ok';
 
             if (normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
@@ -101,7 +123,8 @@ class OutputComponent extends Component {
 
                 } else if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message appears to be truncated.";
-                    decodeTest2.resultText = 'input truncated';
+                    decodeTest2.resultText = 'truncated'; // 'input truncated';
+                    decodeTest2.hideName = true; // no need for "input match: "
                     decodeTest2.result = 'error';  // warn for plain text, but error for other messages
                     //decodeTest2.result = 'warning';
                 } 
@@ -110,7 +133,7 @@ class OutputComponent extends Component {
             }
             return [ decodeTest1, decodeTest2 ];
 
-        } else if (inputType === 'free text') {
+        } else if (inputType.startsWith('free text')) {
             decodeTest2.result = 'ok';
 
             if (decoded.toUpperCase() !== normalizeBracketedFreeText(originalInput).toUpperCase()) {
@@ -119,7 +142,8 @@ class OutputComponent extends Component {
                 decodeTest2.result = 'error';
                 if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message has been truncated to fit 13 character limit of free text.";
-                    decodeTest2.resultText = 'input truncated';
+                    decodeTest2.resultText = 'truncated'; //'input truncated';
+                    decodeTest2.hideName = true; // no need for "input match: "
                     decodeTest2.result = 'warning';
                 }
             } else {
@@ -163,16 +187,16 @@ class OutputComponent extends Component {
 
         const expectedMessage = expected.decoded ?? expected.message;
         if (expectedMessage) {
-            const match = (expectedMessage.trim() === this.message.reDecodedResult.decodedText.trim());
+            const match = (expectedMessage.trim() === this.message.bestDecodedResult?.decodedText?.trim() ?? '[fail]');
             const test = {
                 name: "Message text",
                 result: (expected.error ? (match ? 'warning' : 'warning') : (match ? 'ok' : 'error')),
                 resultText: (expected.error ? (match ? 'Matched test*' : 'Did not match test*') : (match ? 'Matched test' : 'Did not match test')),
                 expected: expectedMessage,
-                actual: this.message.reDecodedResult.decodedText,
+                actual: this.message.bestDecodedResult?.decodedText,
                 note: expected.error ? "Error or truncated result expected" : null
             };
-            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.reDecodedResult.decodedText));
+            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.bestDecodedResult?.decodedText ?? '[fail]'));
             if (!match && hashMatch) {
                 test.result = 'ok';
                 test.resultText = 'Matched test*';
@@ -220,6 +244,11 @@ class OutputComponent extends Component {
     }
 
     renderOutput(data) {
+        if (data == null) {
+            this.container.innerHTML = '';
+            return;
+        }
+
         const outputBox = document.createElement('div');
         outputBox.className = 'output-box';
         outputBox.innerHTML = `
@@ -230,29 +259,32 @@ class OutputComponent extends Component {
                 ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType, isField: false }) : ''}
 
                 ${this.renderSubheading('Message Fields')}
-                ${this.renderRows(data.messageBits, data.ft8MessageType)}
+                ${this.renderRows(this.message.allBits ?? this.message.bits, data.ft8MessageType)}
 
-                ${this.renderSubheading('Encoding')}
+                ${this.renderSubheading('FT8 Packing')}
 
                 ${this.renderChecks('Checks', data.checks)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
+                ${this.renderRowDataHighlights('Symbols', extra.symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
                 ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Zero-extended to 10 bytes.`, 'packed')}
-                ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
+                ${this.renderRowData('Message', data.messageBits, null, `${data.messageBits.length} bits`)}
                 ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
                 ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'Low Density Parity Check (LDPC). The highlighted bits differ from parity data which would match the combined message and CRC bits.', null, '83 bits', 'Low Density Parity Check (LDPC)')}
-                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('Codeword', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Red highlighted bits are the most likely to be incorrect, considering the parity data. Orange highlighted bits are less likely errors. The 174 bits are the message, CRC and LDPC concatenated together.', null, '174-bit', 'The 174 bits are the concatenation of the message, CRC and LDPC.') : ''}
+                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('Codeword', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Red highlighted bits are the most likely to be incorrect, considering the parity data. Orange highlighted bits are less likely errors. The 174 bits are the message, CRC, and LDPC concatenated together.', null, '174-bit', 'The 174 bits are the concatenation of the message, CRC, and LDPC.') : ''}
                 ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'This has changes applied to the codeword, applying a single-step error repair, based on the parity data. Copy this into the input and encode to see the result. If there are only a small number of errors, this may repair the message.', 'corrected', '*') : ''  }
                 
-                ${this.renderSubheading('Decoding')}
+                ${this.renderSubheading('FT8 Unpacking')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
-                ${this.renderRowDataField({label: 'Decoded text', value: data.decodedText, desc: data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null })}
+                
+                ${data.mshvDecodedResult.success ? 
+                    this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'mshv', value: data.decodedText_mshv}) :
+                    this.renderRowDataField({label: 'Decode error', secondaryLabel: 'mshv', value: data.mshvDecodedResult.errorMessage, isField: false})}
+                ${data.ft8libDecodedResult.success ? 
+                    this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'ft8_lib', value: data.decodedText_ft8lib, desc: data.decodedText_mshv.includes('<...>') || data.decodedText_ft8lib.includes('<...>') ? '<...> represents a hashed callsign.' : null }) :
+                    this.renderRowDataField({label: 'Decode error', secondaryLabel: 'ft8_lib', value: data.ft8libDecodedResult.errorMessage, isField: false})}
 
-                ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "Please check if individual message fields were were decoded.") : ''}
-
-                ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
+                ${data.explanation ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
-                ${data.encodeError ? this.renderRowData('Initial error', data.encodeError, 'As a fallback the input was encoded as free text after this initial error.') : ''}
 
                 ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known reference') : ''}
                 ${data.tests && data.tests.tests ? this.renderChecks('Tests', data.tests.tests) : ''}
@@ -339,20 +371,20 @@ class OutputComponent extends Component {
         //todo:
         //const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
 
-        const zhash = (hashBits && hashBits.length > 0) ? hashBitsPrettyZ32(hashBits) : null;
-        const hashIntStr = (hashBits && hashBits.length == 22) ? hashBitsTo22styleBase10(hashBits) : null;
+        const zhash = (hashBits && hashBits.length > 0) ? extra.hashBitsPrettyZ32(hashBits) : null;
+        const hashIntStr = (hashBits && hashBits.length == 22) ? extra.hashBitsTo22styleBase10(hashBits) : null;
 
         //todo: less hackish escapeHTML toggle
         let valueText = '';
         if (callsign || zhash) {
             //const boldifyCall = true; // !isHash; // turn off hash highlighting for now
-            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
+            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${extra.addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
             if (country) { valueText += `<div class="output-country gravity-low">${escapeHTML(country)}</div>`; }
         } else {
             if (isFlag) { 
                 valueText = `${this.makeSwitch(bits === '1', off, on)}`;
 
-            } else if (bits == '0' || bits == '1') {
+            } else if ((bits == '0' || bits == '1') && units == null) { // not a switch if you set units; bit of a hack
                 //valueText = `<span class="output-data>${this.makeSwitch(bits === '1', '0', '1')}</span>`;
                 valueText = `${this.makeSwitch(bits === '1', '0', '1')}`;
             } else {
@@ -365,7 +397,7 @@ class OutputComponent extends Component {
                 <div class="output-label">${label}${secondaryLabel ? ` <span class="output-sublabel">${secondaryLabel}` : ''}</span></div>` 
                 + `<div class="output-value">${valueText}${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }`
                 + `${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}` 
-                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }`  +
+                + `${(bits && (bits.length >= 2 || rawAppend != null)) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }`  +
                `</div>`
                 + `${desc ? `<div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>` : ''}` 
                 + `${descNoEsc ? `<div class="output-comment">${descNoEsc}</div>` : ''}
@@ -441,11 +473,15 @@ class OutputComponent extends Component {
                 default: return '';
             }
         };
-    
+        if (checks == null) {
+            //console.log('no checks', checks);
+            return '';
+        }
+
         const checksHtml = checks.map(check => `
             <span class="check-result check-${check.result.toLowerCase()}">
                 <span class="check-icon">${getIcon(check.result)}</span>
-                ${check.name}: ${check.resultText ?? check.result}
+                ${check.hideName ? '' : `${check.name}: `}${check.resultText ?? check.result}
             </span>
         `).join('');
     
@@ -516,7 +552,7 @@ class OutputComponent extends Component {
     getSyncHighlights(syncCheck) {
         //3240652 03224752350406114701746102526 3142652 00751360767311242423320017621 3142652
         if (syncCheck.result !== 'error') return [];
-        const costasPositions = [0, 36, 72];
+        //const costasPositions = [0, 36, 72];
         
         return syncCheck.errors.map(index => {
             let prettyIndex = index;
@@ -582,3 +618,5 @@ function escapeHTML(text) {
         return map[match];
     });
 }
+
+//export default OutputComponent;

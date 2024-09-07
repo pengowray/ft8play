@@ -20,12 +20,9 @@
       <button id="encode-button" class="btn">Encode</button>
     </div>
 
-    <div id="error-output"></div>
-    
     <div class="settings-toggle">
         <button id="toggle-settings">Audio Settings ▼</button>
     </div>
-
     <div id="audio-settings" class="hidden">
         <div class="setting-group">
             <label for="base-freq-input">Base Frequency (Hz):</label>
@@ -36,7 +33,10 @@
             <select id="sample-rate-select"></select>
         </div>
     </div>
-
+    <div id="tab-container"></div>
+    
+    <div id="error-output"></div>
+    
     <div id="audio-controls">
       <button id="play-audio" class="btn">Play Audio</button>
       <button id="play-audio-timed" class="btn">Play Next 15s Slot</button>
@@ -93,24 +93,27 @@
 </div>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
-<script src="ft8_wasm.js"></script>
-<script src="ft8_ft8lib.js"></script>
-<script src="ft8_extra.js"></script>
-<script src="ft8_msg.js"></script>
-<script src="ft8_anno.js"></script>
-<script src="ft8_explain.js"></script>
-<script src="views.js"></script>
-<script src="views_viz.js"></script>
-<script src="views_piano.js"></script>
-<script src="views_output.js"></script>
-<script src="views_bits.js"></script>
-<script src="views_play.js"></script>
-<script src="ft8_tests.js"></script>
-<script src="HamGridSquare.js"></script>
-<script src="ctydata.js"></script>
-<script src="main.js" defer></script>
-<script>
-    
+<script src="./ft8lib/ft8_wasm.js" type="module"></script>
+<script src="ft8_ft8lib.js" type="module"></script>
+<script src="ft8_extra.js" type="module"></script>
+<script src="ft8_msg.js" type="module"></script>
+<script src="ft8_anno.js" type="module"></script>
+<script src="ft8_explain.js" type="module"></script>
+<script src="views.js" type="module"></script>
+<script src="views_viz.js" type="module"></script>
+<script src="views_piano.js" type="module"></script>
+<script src="views_output.js" type="module"></script>
+<script src="views_bits.js" type="module"></script>
+<script src="views_play.js" type="module"></script>
+<script src="ft8_tests.js" type="module"></script>
+<script src="HamGridSquare.js" type="module"></script>
+<script src="ctydata.js" type="module"></script>
+<script src="mshv_ft8_wrap.js" type="module"></script>
+<script src="./mshv/mshv_ft8.js" type="module"></script>
+<script src="main.js" type="module"></script>
+<script type="module">
+import { initializeUI } from './main.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     initializeUI(); // main.js
 });

@@ -1,3 +1,16 @@
+import { FT8Message } from './ft8_msg.js';
+import { inputToTabs } from './ft8_tabs.js';
+import { ViewManager } from './views.js';
+//import { VizComponent, PianoRollComponent, OutputComponent, TribbleComponent, PlayBtnComponent } from './components.js';
+import { VizComponent } from './views_viz.js';
+import { PianoRollComponent } from './views_piano.js';
+import { TribbleComponent } from './views_bits.js';
+import { OutputComponent } from './views_output.js';
+import { PlayBtnComponent } from './views_play.js';
+import { testInputs_ft8code, ft8_examples } from './ft8_tests.js';
+import { getFT8MessageTypeName } from './ft8_extra.js';
+import * as extra from './ft8_extra.js';
+
 const exampleMessages = [
     "CQ K1ABC FN42",
     "K1ABC W9XYZ -15",
@@ -6,8 +19,6 @@ const exampleMessages = [
     "W9XYZ K1ABC 73",
     "<TNX BOB 73 GL>"
 ];
-
-
 
 function initializeUI() {
     //let currentTime = 0;
@@ -41,33 +52,16 @@ function initializeUI() {
     const audioVisualization = document.getElementById('audio-visualization');
     const tribbleViz = document.getElementById('tribble-visualization');
     const testSelect = document.getElementById('test-select');
+    const tabContainer = document.getElementById('tab-container');
 
-    viewManager.registerComponent(new VizComponent(-1, audioVisualization));
-    viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
-    viewManager.registerComponent(new OutputComponent(-1, output));
-    viewManager.registerComponent(new TribbleComponent(-1, tribbleViz));
+    viewManager.registerComponent(new VizComponent(-99, audioVisualization));
+    viewManager.registerComponent(new PianoRollComponent(-99, pianoRollDiv));
+    viewManager.registerComponent(new OutputComponent(-99, output));
+    viewManager.registerComponent(new TribbleComponent(-99, tribbleViz));
     viewManager.registerComponent(new PlayBtnComponent(-2, audioControls));
 
     const initializeTestInputs = () => {;
-        testInputs.forEach((test, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = test.name || test.value;
-            testSelect.appendChild(option);
-        });
-
-        testSelect.addEventListener('change', (event) => {
-            const selectedIndex = event.target.value;
-            if (selectedIndex !== "") {
-                const selectedTest = testInputs[selectedIndex];
-                messageInput.value = selectedTest.value;
-                doEncode();
-            }
-        });
-    }
-    //initializeTestInputs();
-
-    const initializeTestInputs_ft8code = () => {;
+       
         ft8_examples.forEach((test, index) => {
             const option = document.createElement('option');
             option.value = `example ${index}`;
@@ -82,38 +76,92 @@ function initializeUI() {
             testSelect.appendChild(option);
         });
 
+        //TODO: check if there's anything lost by not having these and only having the "expected" tab instead
+        /*
         testInputs_ft8code.forEach((test, index) => {
             const option2 = document.createElement('option');
             option2.value = `ft8codeSymbols ${index}`;
             option2.textContent = `(${test.type}) ${test.message} (unpack)`;
             testSelect.appendChild(option2);
         });
+        */
 
-        testSelect.addEventListener('change', (event) => {
-            const selected = event.target.value.split(' ');
-            selectedType = selected[0];
-            selectedIndex = parseInt(selected[1]);
-            if (selectedIndex !== "") {
-                if (selectedType === 'ft8codeMsg') {
-                    const selectedTest = testInputs_ft8code[selectedIndex];
-                    messageInput.value = selectedTest.message;
-                    const expectedResults = { ...selectedTest, testType: selectedType};
-                    doEncode(expectedResults);
-                } else if (selectedType === 'ft8codeSymbols') {
-                    const selectedTest = testInputs_ft8code[selectedIndex];
-                    messageInput.value = selectedTest.symbols;
-                    const expectedResults = {...selectedTest, ...{symbols:null}, testType: selectedType}; // don't bother testing symbols when they're in the input
-                    doEncode(expectedResults);
-                } else if (selectedType === 'example') {
-                    const selectedTest = ft8_examples[selectedIndex];
-                    messageInput.value = selectedTest.value;
-                    const nonTest = { ...selectedTest, testType: selectedType};
-                    doEncode(nonTest); // to add a comment
-                }
-            }
-        });
+        testSelect.addEventListener('change', handleTestInputChange);
     }
-    initializeTestInputs_ft8code();
+
+    function handleTestInputChange(event) {
+        const selected = event.target.value.split(' ');
+        let selectedType = selected[0];
+        let selectedIndex = parseInt(selected[1]);
+        if (selectedIndex !== "") {
+            if (selectedType === 'ft8codeMsg') {
+                const selectedTest = testInputs_ft8code[selectedIndex];
+                messageInput.value = selectedTest.message;
+                const expectedResults = { ...selectedTest, testType: selectedType};
+                doEncode(expectedResults);
+            } else if (selectedType === 'ft8codeSymbols') {
+                const selectedTest = testInputs_ft8code[selectedIndex];
+                messageInput.value = selectedTest.symbols;
+                const expectedResults = {...selectedTest, ...{symbols:null}, testType: selectedType}; // don't bother testing symbols when they're in the input
+                doEncode(expectedResults);
+            } else if (selectedType === 'example') {
+                const selectedTest = ft8_examples[selectedIndex];
+                messageInput.value = selectedTest.value;
+                const nonTest = { ...selectedTest, testType: selectedType};
+                doEncode(nonTest);
+            }
+        }
+    }
+
+    initializeTestInputs();
+
+    document.addEventListener('keydown', handleKeyboardShortcuts);
+
+    function handleKeyboardShortcuts(event) {
+        if (isEditableElement(document.activeElement)) {
+            return;
+        }
+
+        if (event.ctrlKey || event.metaKey) {
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                changeTab(1);
+            } else if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                changeTab(-1);
+            }
+        } else if (event.shiftKey) {
+            if (event.key === '.' || event.key === '>') {
+                event.preventDefault();
+                changeTestInput(1);
+            } else if (event.key === ',' || event.key === '<') {
+                event.preventDefault();
+                changeTestInput(-1);
+            }
+        }
+    }
+    
+    function isEditableElement(element) {
+        return element.tagName === 'INPUT' || 
+               element.tagName === 'TEXTAREA' || 
+               element.isContentEditable;
+    }
+    
+    function changeTab(direction) {
+        const tabs = Array.from(tabContainer.children);
+        const activeTabIndex = tabs.findIndex(tab => tab.classList.contains('active'));
+        if (activeTabIndex !== -1) {
+            const newIndex = (activeTabIndex + direction + tabs.length) % tabs.length;
+            tabs[newIndex].click();
+        }
+    }
+
+    function changeTestInput(direction) {
+        const currentIndex = testSelect.selectedIndex;
+        const newIndex = (currentIndex + direction + testSelect.options.length) % testSelect.options.length;
+        testSelect.selectedIndex = newIndex;
+        testSelect.dispatchEvent(new Event('change'));
+    }
 
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;
@@ -121,17 +169,13 @@ function initializeUI() {
 
     const parseNote = (note) => {
       const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      //const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
       const flatToSharp = { 'DB': 'C#', 'EB': 'D#', 'GB': 'F#', 'AB': 'G#', 'BB': 'A#' };          
-      // Validate input
 
       if (typeof note !== 'string') return NaN;
-      note = note.toUpperCase();
-      
-      // Convert flat notation to sharp notation if necessary
-      //let normalizedNote = note.replace(/([A-G])b(\d?)$/, (_, noteLetter, octave) => 
-      //  (flatToSharp[noteLetter + 'b'] || noteLetter + 'b') + octave
-      //);
+      note = note.toUpperCase().replace('♭', 'B').replace('♯', '#');
+      // TODO: ♭ should only be second letter; use detectNoteNotation instead?
+
+      // Convert flat notation to sharp notation
       let normalizedNote = note.replace(/([A-G])B(\d?)$/, (_, noteLetter, octave) => 
         (flatToSharp[noteLetter + 'B'] || noteLetter + 'B') + octave
       );
@@ -147,19 +191,34 @@ function initializeUI() {
     };
 
     function detectNoteNotation(input) {
+      const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
       // Regular expression to match note notation
-      //const notePattern = /^([A-G](#|b)?)(\d)?$/;
-      const notePattern = /^([A-G](#|B)?)(\d)?$/;
+      
+      const notePattern = /^([A-G])(#|B|♭|♯)?([+-]?\d+)?$/;
       const match = input.toUpperCase().match(notePattern);
       
       if (match) {
         const [, note, accidental, octave] = match;
-        return {
+        if (accidental === 'B' || accidental === '♭') accidental = 'b';
+        if (accidental === '♯') accidental = '#';
+
+        let returnNote = {
           isValid: true,
-          note: note,
-          accidental: accidental || null,
-          octave: octave ? parseInt(octave) : null
+          noteInput: note + accidental + (parseInt(octave) || ''),
+          note: flatToSharp[noteInput] || noteInput,
+          //octaveInput: octave ? parseInt(octave) : null,
+          octave: octave ? parseInt(octave) : 4,
+          //accidentalInput: accidental || null,
         };
+        if (!returnNote.note) return { isValid: false };
+
+        const a4 = 440;
+        returnNote.keyNumber = notes.indexOf(returnNote.note);
+        returnNote.frequency = a4 * Math.pow(2, (notes.octave - 4) + (returnNote.keyNumber - 9) / 12);
+
+        return returnNote;
       } else {
         return { isValid: false };
       }
@@ -257,21 +316,19 @@ function initializeUI() {
         let strings = [];
         let failed = false;
         
-        if (message.encodeError_ft8lib) {
-            strings.push(`ft8_lib error: ${message.encodeError_ft8lib}`);
-            // not failure yet (may have fallen back to freetext)
-        }
         if (exception != null) {
-            console.error("exception", exception);
+            console.error("Exception", exception);
             strings.push(`Exception: ${exception}`);
             failed = true;
         }
-        if (message.error) {
-            strings.push(`General error: ${message.error}`);
+
+        if (message && message.encodeError) {
+            strings.push(`Encoding error: ${message.encodeError}`);
             failed = true;
         }
-        if (message.encodeError) {
-            strings.push(`encoding error: ${message.encodeError}`);
+
+        if (!message) {
+            strings.push(`No message object was created.`);
             failed = true;
         }
         
@@ -280,25 +337,55 @@ function initializeUI() {
             messageContent.style.display = 'none';
             errorOutput.innerHTML = strings.join("<br>");
             return true;
+
         } else {
             errorOutput.innerHTML = '';
             errorOutput.style.display = 'none';
             messageContent.style.display = 'block';
             return false;
         }
-        
     }
     
     function handleEncode(testData = null) {
         let inputText = messageInput.value;
-        message = new FT8Message(inputText); //messageManager.createMessage(inputText);
-        message.expectedResults = testData;
 
-        message.encode();
-        if (message.error != null) {
+        //message = new FT8Message(inputText, testData);
+        //message.encode();
+
+        const tabs = inputToTabs(inputText, testData);
+        //console.log('tabs', tabs);
+
+        //const msg = tabs[0] ?? null;
+        const msg = tabs.find(tab => tab.encodeError === null) || tabs[0] || null;
+
+        changeToMessage(msg);
+    }
+    
+    function handleTabSwitch(msg) {
+        changeToMessage(msg);
+    }
+   
+    /*
+    function handleViewManagerTabSwitch(index) {
+        if (viewManager.messages.length > index) {
+            viewManager.switchToMessageIndex(index);
+            updateTabUI(index);
+        }
+    }
+    */
+
+    function changeToMessage(msg) {
+        //TODO: separate: views stuff and audio stuff and updateTabUI stuff (already in its own function)
+
+        message = msg;
+
+        updateTabUI();
+        const hasErrors = handleError(msg); // will unhide messageContent if no errors
+        
+        if (msg == null || hasErrors) {
+            viewManager.switchToMessageIndex(-1);
             return;
         }
-
         // gather audio options
         const freqData = parseFrequencyInput(baseFreqInput.value);
         if (!freqData) {
@@ -320,7 +407,64 @@ function initializeUI() {
         } else {
             throw new Error("Error generating audio data generated");
         }
+
     }
+
+    function updateTabUI() {
+        tabContainer.innerHTML = '';
+        
+        //const tabList = viewManager.messages;
+        const tabList = message?.tabs;
+        if (tabList == null) return;
+
+        tabList.forEach((msg, index) => {
+            const tabButton = document.createElement('button');
+            if (msg == null) {
+                console.log("null message in tab list at index", index);
+            }
+            if (msg.inputType != null && msg.inputType.length > 0) {
+                // todo: inputTypeDescriptions[msg.type] + inputType
+                //const typeName = msg.type;
+                let typeInfo = msg.inputType;
+                if (typeInfo != null && typeInfo.startsWith('default/')) {
+                    typeInfo = typeInfo.slice(8);
+                }
+
+                if (msg.packetType == 'spp') {
+                    tabButton.innerHTML = `Space Packet Protocol 🛰<br>${typeInfo}`;
+                } else {
+
+                    if (msg.ft8MessageType && msg.inputType && !['free text', 'telemetry'].includes(msg.inputType)) {
+                        typeInfo += ' → ' + (extra.getFT8MessageTypeName(msg.ft8MessageType) || msg.ft8MessageType);
+                    }
+
+                    if (msg.bestDecodedResult?.success) { 
+                        tabButton.innerHTML = `<b>${msg.bestDecodedResult.decodedText}</b><br>${typeInfo}`;
+                    } else {
+                        tabButton.innerHTML = typeInfo;
+                    }
+                }
+
+            } else {
+                tabButton.textContent = `Tab ${index + 1}`;
+            }
+            tabButton.classList.add('tab-button');
+            //if (index === activeIndex) {
+            if (msg === message) {
+                tabButton.classList.add('active');
+            } else if (!msg.encodeError && !message.encodeError && msg.bits === message.bits && msg.packetType == message.packetType) {
+                tabButton.classList.add('equal');
+            }
+
+            //todo: warning too
+            if (msg.encodeError) {
+                tabButton.classList.add('error');
+            }
+            tabButton.onclick = () => handleTabSwitch(msg); // handleTabSwitch(index)
+            tabContainer.appendChild(tabButton);
+        });
+    }
+
 
     exampleMessages.forEach(message => {
         const button = document.createElement('button');
@@ -357,10 +501,8 @@ function initializeUI() {
     const toggleVisualizationButton = document.getElementById('toggle-visualization');
     const VisualizationCaption = document.getElementById('visualization-caption');
 
-    //TODO XXX
-    //toggleVisualizationButton.addEventListener('click', toggleVisualization);
-
 }
+
 
 /*
 if (typeof Module !== 'undefined') {
@@ -369,3 +511,5 @@ if (typeof Module !== 'undefined') {
     document.addEventListener('DOMContentLoaded', initializeUI);
 }
 */
+
+export { initializeUI };

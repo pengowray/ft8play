@@ -1,90 +1,160 @@
-const hashes = {}; // a little global never hurt noone
+import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta, symbolsToPackedData  } from "./ft8_extra.js";
+import * as extra from "./ft8_extra.js";
+import * as hashmgr from "./ft8_hashmgr.js";
+import FT8LIB from "./ft8_ft8lib.js";
+import MSHVFT8 from "./mshv_ft8_wrap.js";
 
-function addHash(callsign) {
-    //TODO: watch for conflicts
-    //TODO: priorty levels
-    if (callsign == null) return;
-    
-    callsign = callsign.toUpperCase().trim();
-    if (callsign == '') return;
-
-    if (callsign.startsWith('<') && callsign.endsWith('>')) {
-        callsign = callsign.slice(1, -1).trim();
-        if (callsign == '') return;
-    }
-
-    const hashInt = hashCallsign(callsign);
-    if (hashInt == null) return;
-    const hashBits = hashInt.toString(2).padStart(22, '0');
-    const zhash = hashBitsToZ32Dense(hashBits);
-    const entry = [hashInt, callsign];
-
-    if (zhash) {
-        // 22, 12 and 10 bit hashes.
-        // hashes[aabcc] = [hashInt, callsign]
-        // hashes[aab] = [hashInt, callsign]
-        // hashes[aa] = [hashInt, callsign]
-        hashes[zhash] = entry; // 22 bits
-        hashes[zhash.slice(0, 3)] = entry; // 12 bits
-        hashes[zhash.slice(0, 2)] = entry; // 10 bits
-    }
-}
-function findHash(bits) {
-    //todo: accept int too; use: callsignToHashBits(hashInt)
-    const zhash = hashBitsToZ32Dense(bits);
-    if (zhash == null || zhash == '') return null;
-    if (zhash in hashes) {
-        const entry = hashes[zhash];
-        const entryBits = entry[0].toString(2).padStart(22, '0');
-        return {hashInt: entry[0], callsign: entry[1], hashBits: entryBits};
-    }
-    return null;
-}
-
-function addHashesFromInput(inputText) {
-    input = inputText.toUpperCase();
-    const pieces = input.split(/[\s;\.]+/);
-    //const pieces = input.split(' ');
-    //console.log("addHashesFromInput", input, pieces);
-
-    for (const piece of pieces) {
-        //ignore if only numbers
-        if (/^\d+$/.test(piece)) continue;
-
-        // add with and without /suffix
-        addHash(piece);
-        if (piece.includes('/')) addHash(piece.split('/')[0]);
-    }
-}
-function addDefaultHashes() {
-    const defaultHashes = ['', 'K1JT', 'K9AN', 'N0CALL', 'QU1RK', 'W1AW', 'CQ', 'VK3PGO', 'AA9GO', 'DEMO', 'D3MO', 'DEM0', 'D3M0', 'A1AAA', 'XX9XXX', 'EXAMPLE', 'CALLSIGN', 'CALLSIGN1', 'TEST', 'TEST1', 'TE1ST', 'TESTCALL', 'TESTCALL1', 'TEST1CALL', 'W3XYZ', 'K5ABC', 'VE3XXX', 'N1ZZZ', 'DL0ABC', 'VK2XYZ', 'ZL1AAA', 'JA1XXX', 'M0ABC', 'IT9XXX', 'ERROR', 'ERR0R','NUL', 'NULL', 'NIL', 'EMPTY'];
-    for (const callsign of defaultHashes) {
-        addHash(callsign);
-    }
-}
-addDefaultHashes();
-
+const ft8lib = new FT8LIB();
+const mshvft8 = new MSHVFT8();
 
 class FT8Message extends EventTarget {
-    /**
-     * 
-     * @param {string} inputText 
-     */
-    constructor(inputText) {
+
+    initSymbolsText(symbolsText) {
+        this.symbolsText = symbolsText;
+        this.packedData = extra.symbolsToPackedData(symbolsText);
+        this.bits = extra.symbolsToBitsStrNoCosta(this.symbolsText).slice(0, 77); // == symbolsToBitsStr(this.symbolsText).slice(21, 108);
+        this.postInit();
+    }
+
+    initPackedData(packedData) {
+        this.packedData = packedData;
+        this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
+        this.bits = extra.symbolsToBitsStrNoCosta(this.symbolsText).slice(0, 77);
+        this.postInit();
+    }
+
+    initBits(bits77) {
+        this.bits = bits77;
+        this.packedData = extra.bitsToPacked(bits77);
+        this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
+        this.postInit();
+    }
+
+    initMessage(text, encoder) {
+        // note: text assumed to be normalized and uppercase
+        if (encoder === 'ft8lib') {
+            //var result = ft8lib.encodeFT8Message(text);            
+            const packingResult = ft8lib.messageToPackedData(text);
+            if (packingResult.success) {
+                this.initPackedData(packingResult.data);
+
+            } else {
+                throw new Error(`Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
+            }
+
+        } else if (encoder === 'mshv') {
+            const mshvPackingResult = mshvft8.packMessage(text);
+            if (mshvPackingResult.errorCode == 0 && mshvPackingResult.message) {
+                this.initBits(mshvPackingResult.message);
+            } else {
+                this.encodeError = mshvPackingResult.errorCode;
+            }
+        } else {
+            throw new Error("Unknown encoder or No encoder specified: '" + encoder + "'");
+        }
+    }
+
+    postInit() {
+        // todo: separate checks and additions
+
+        this.packetType ??= (this.ft8MessageType !== null && ft8MessageType === 'spp') ? 'spp' : 'ft8';
+
+        if (this.symbolsText == null && this.packedData != null) {
+            console.log("empty symbols, generating from packed data (should not happen).")
+            this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
+
+        } else if (this.packedData == null && this.symbolsText != null) {
+            console.log("empty packed data, generating from symbols (should not happen)");
+            this.packedData = extra.symbolsToPackedData(this.symbolsText);
+        }
+
+        if (this.symbolsText == null) {
+            this.encodeError = "Failed to generate symbols";
+            throw new Error(this.encodeError);
+        }
+
+        if (this.packedData == null) {
+            this.encodeError = "Failed to generate packed data";
+            throw new Error(this.encodeError);
+        }
+
+        var packedBits = extra.packedDataTo80Bits(this.packedData);
+        const zeroPadding = packedBits.slice(77);
+        //this.bits = packedBits.slice(0, 77);
+        if ((this.packetType == null || this.packetType === 'ft8') && zeroPadding != '000') {
+            this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
+            throw new Error(this.encodeError);
+        }
+
+        if (this.bits != packedBits.slice(0, 77)) {
+            throw new Error("Packed data does not match bits");
+        }
+
+        this.ft8MessageType ??= extra.getFT8MessageType(this.bits);
+
+        // re-encoding messages
+        
+        //TODO: use both / use consistant format
+        //TODO: add ft8play decode
+        //TODO: should it use hashmgr?
+        this.ft8libDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
+        
+        // translate into ft8libDecodedResult format; TODO: should be other way around
+        const resultMshv = mshvft8.unpackMessage(this.bits);
+        if (resultMshv != null && resultMshv.errorCode == 0) {
+            this.mshvDecodedResult = {success: true, resultText: resultMshv.message, result: resultMshv.message, decodedText: resultMshv.message };
+        } else {
+            this.mshvDecodedResult = {success: false, error: true, result: 'error', errorMessage: resultMshv?.message, errorCode: resultMshv.errorCode, decodedText: null };
+        }
+
+        this.bestDecodedResult = this.mshvDecodedResult?.success ? this.mshvDecodedResult : (this.ft8libDecodedResult?.success ? this.ft8libDecodedResult : this.mshvDecodedResult);
+    }
+
+    bestDecodedResultFromExpected(expectedResults) {
+        if (expectedResults == null) {
+            this.bestDecodedResult = null;
+            return;
+        }
+        
+        if (!expectedResults.error) {
+            this.bestDecodedResult = {success: true, resultText: expectedResults.message, result: expectedResults.message, decodedText: expectedResults.message };
+        } else {
+            this.bestDecodedResult = {success: false, error: true, result: 'error', result: expectedResults.message, errorMessage: 'Could not unpack in reference', decodedText: expectedResults.decoded };
+            this.decodingError = expectedResults.decoded;
+
+        }
+
+
+        return null;
+    }
+
+    constructor(inputText, expectedResults = null) {
       super();
 
       this.inputText = inputText;
+
+      this.normalizedInput = null;
       this.inputType = null; // can be manual set, otherwise auto-detected
-      this.expectedResults = null; // if running test against known input. 
+      this.expectedResults = expectedResults; // if running test against known input
+
+      // Always set all three by calling one of the init methods (unless there's an error)
+      this.symbolsText = null;
+      this.packedData = null;
+      this.bits = null; // string of 77 bits
+
+      this.allBits = null; // all bits needed for annotations: 80 bits for SPP; will be 237 bits for FT8 but keeping it null for now
+      this.packetType = null; // 'ft8' or 'spp
+      this.ft8MessageType = null;
 
       // results of encoding
       this.encodeError = null;
-      this.encodeError_ft8lib = null;
-      //this.encodedData = null;
-      this.symbolsText = null;
-      this.packedData = null;
 
-      this.reDecodedResult = null;
+      // results of decoding final packed message
+      this.ft8libDecodedResult = null;
+      this.mshvDecodedResult = null;
+      this.bestDecodedResult = null;
+
+      this.tabs = null;
 
       // cached checks
       this.SyncCheck = null;
@@ -121,7 +191,11 @@ class FT8Message extends EventTarget {
       // ViewManager for reporting audio stop/start/queued/etc
       this.viewManager = null;
 
-      this.hashes = hashes;
+      if (hashmgr && hashmgr.mshvft8 == null) {
+          hashmgr.setMshvft8(mshvft8);
+      }
+      
+      //this.hashes = hashmgr.hashes;
 
       // setup Event Listeners
       //this.dispatchEvent(new Event('queue'));
@@ -149,7 +223,7 @@ class FT8Message extends EventTarget {
         // returns null if nothing to repair
         const parityCheck = this.getParityCheck();
         if (parityCheck == null || parityCheck.success) return null;
-        const repaired = repairErrorsOnce(symbolsToBitsStrNoCosta(this.symbolsText), parityCheck);
+        const repaired = extra.repairErrorsOnce(symbolsToBitsStrNoCosta(this.symbolsText), parityCheck);
         return repaired;
     }
 
@@ -176,142 +250,6 @@ class FT8Message extends EventTarget {
         //const currentSymbolIndex = Math.floor(audioCurrentTime / symbolDuration);
         
         return { isPlaying, audioCurrentTime, startTime,  currentTime, duration, remainingTime, progress, currentSymbolIndex };
-    }
-
-    detectInputType() {
-        this.inputType = doDetectInputType(this.inputText);
-        return this.inputType;
-    }
-
-    globalInputNormalization(input) {
-        // any input types we shouldn't normalize in all the ways?
-        // TODO: normalize unicode numbers / strip diacritics / etc
-        return input.trim().toUpperCase().replace(/\s+/g, ' ').replace('Ø', '0');
-    }
-
-    encode() {
-
-        let input = this.inputText;
-        input = this.globalInputNormalization(input);
-        const inputType = this.inputType ?? this.detectInputType();
-
-        //let packedData, symbolsText;
-
-        switch (inputType) {
-            case 'free text':
-                input = normalizeBracketedFreeText(input);
-                this.packedData = encodeFT8FreeText(input);
-                break;
-            case '79 symbols':
-                input = normalizeSymbols(input);
-                this.symbolsText = input;
-                break;
-            case '58 symbols':
-                input = normalizeSymbols(input);
-                this.symbolsText = symbols58ToSymbols79(input);
-                break;
-            case 'packed':
-                input = normalizePackedData(input);
-                this.packedData = new Uint8Array(input.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-                break;
-            case 'telemetry':
-                input = normalizeTelemetry(input);
-                let result = encodeFT8Telemetry(input);
-                if (result.error) {
-                    this.encodeError = result.error;
-                    throw new Error(result.error);
-                }
-                this.packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-                break;
-            case '77 bits':
-                input = normalizePackedData(input);
-                this.packedData = bitsToPacked(input);
-                break;
-            case '80 bits':
-            case '82 bits':
-                const bitStr = normalizeBinary(input);
-                const zeroPadding = bitStr.slice(77);
-                if (zeroPadding != '000' && zeroPadding != '00000') {
-                    this.encodeError = `Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr}`;
-                    throw new Error(this.encodeError);
-                }
-                this.packedData = bitsToPacked(bitStr.slice(0, 77));
-                break;
-            case '91 bits':
-                this.symbolsText = binary91ToSymbols(normalizeBinary(input));
-                break;
-            case '174 bits':
-                this.symbolsText = binary174ToSymbols(normalizeBinary(input));
-                break;
-            case '237 bits': // symbols (as normal binary, including sync)
-                this.symbolsText = binary237ToSymbols(normalizeBinary(input));
-                break;
-            case '237 grits': // symbols (as graycode bits, including sync)
-                this.symbolsText = grayBitsToSymbols(normalizeBinary(input));
-                break;
-            case 'default':
-            default:
-                input = normalizeMessage(input);
-                addHashesFromInput(this.inputText);
-
-                const packingResult = messageToPackedData(input);
-
-                if (packingResult.success) {
-                    this.packedData = packingResult.data;
-                    
-                } else {
-                    this.encodeError_ft8lib = `Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`;
-                    console.log("falling back to free text because error: ", this.encodeError_ft8lib);
-                    //this.encodeError = this.encodeError_ft8lib;
-
-                    // attempt free text fallback
-                    input = normalizeBracketedFreeText(input); // in case there's brackets
-                    this.packedData = encodeFT8FreeText(input);
-
-                    if (this.packedData == null) {
-                        this.encodeError = "Failed to encode as free text";
-                        throw new Error(this.encodeError);
-                    }
-                    //if failed will try to encode as free text
-                }
-                break;
-        }
-
-        if (this.symbolsText == null && this.packedData != null) {
-            this.symbolsText = packedDataToSymbolsArray(this.packedData);
-
-        } else if (this.packedData == null && this.symbolsText != null) {
-            //console.log("empty packed data, generating from symbols");
-            this.packedData = symbolsToPackedData(this.symbolsText);
-        }
-
-        if (this.symbolsText == null) {
-            this.encodeError = "Failed to generate symbols";
-            throw new Error(this.encodeError);
-        }
-
-        if (this.packedData == null) {
-            this.encodeError = "Failed to generate packed data";
-            throw new Error(this.encodeError);
-        }
-    
-        if (this.packedData) {
-            var packedBits = packedDataTo80Bits(this.packedData);
-            const zeroPadding = packedBits.slice(77);
-            if (zeroPadding != '000') {
-                this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
-                throw new Error(this.encodeError);
-            }
-        }
-
-        this.ft8MessageType = getFT8MessageType(this.packedData);
-        this.reDecodedResult = decodeFT8FromPackedData(this.packedData, this.packedData.length);
-
-        if (this.expectedResults) {
-            if (this.expectedResults?.decoded) addHashesFromInput(this.expectedResults.decoded);
-            if (this.expectedResults?.message) addHashesFromInput(this.expectedResults.message);
-        }
-
     }
 
     setAudioOptions(sampleRate, baseFrequency, customToneFrequencies = null) {
@@ -349,7 +287,7 @@ class FT8Message extends EventTarget {
     readyAudioAndBuffer() {
         this.readyAudio();
 
-        if (this.audioSamples == null) {
+        if (this.audioSamples == null || this.audioSamples.length == 0) {
             // failed to generate audio
             return;
         }
@@ -484,23 +422,23 @@ class FT8Message extends EventTarget {
         
         // Allocate memory for symbols string
         //const symbolsPtr = Module.stringToUTF8(this.symbolsText);
-        const symbolsPtr = Module._malloc(numSymbols + 1); // +1 for null terminator
+        const symbolsPtr = ft8lib.module._malloc(numSymbols + 1); // +1 for null terminator
         for (let i = 0; i < numSymbols; i++) {
-            Module.HEAP8[symbolsPtr + i] = this.symbolsText.charCodeAt(i);
+            ft8lib.module.HEAP8[symbolsPtr + i] = this.symbolsText.charCodeAt(i);
         }
-        Module.HEAP8[symbolsPtr + numSymbols] = 0; // Null terminator
+        ft8lib.module.HEAP8[symbolsPtr + numSymbols] = 0; // Null terminator
 
         // Calculate number of samples
-        let numSamples = Module._calculate_num_samples(numSymbols, options.symbolPeriod, options.sampleRate);
+        let numSamples = ft8lib.module._calculate_num_samples(numSymbols, options.symbolPeriod, options.sampleRate);
     
         // Allocate memory for audio and dphi
-        const audioPtr = Module._malloc(numSamples * 4);
-        const dphiPtr = Module._malloc(numSamples * 4);
-        const levelsPtr = Module._malloc(numSamples * 4);
+        const audioPtr = ft8lib.module._malloc(numSamples * 4);
+        const dphiPtr = ft8lib.module._malloc(numSamples * 4);
+        const levelsPtr = ft8lib.module._malloc(numSamples * 4);
 
         // Allocate memory for metadata
-        const metadataLengthPtr = Module._malloc(4);
-        const metadataJsonPtrPtr = Module._malloc(4);
+        const metadataLengthPtr = ft8lib.module._malloc(4);
+        const metadataJsonPtrPtr = ft8lib.module._malloc(4);
         const FT8_TONE_COUNT = 8;
     
         let result;
@@ -509,23 +447,23 @@ class FT8Message extends EventTarget {
     
         if (options.customToneFrequencies != null) {
             // Use custom tone frequencies
-            const toneOffsetsPtr = Module._malloc(FT8_TONE_COUNT * 4);
-            const toneOffsets = new Float32Array(Module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
+            const toneOffsetsPtr = ft8lib.module._malloc(FT8_TONE_COUNT * 4);
+            const toneOffsets = new Float32Array(ft8lib.module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
             for (let i = 0; i < FT8_TONE_COUNT; i++) {
                 toneOffsets[i] = options.customToneFrequencies[i];
             }
     
-            result = Module._synth_gfsk_custom(
+            result = ft8lib.module._synth_gfsk_custom(
                 symbolsPtr, options.baseFrequency, toneOffsetsPtr,
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
                 n_start_delay, n_end_extension,
                 audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
             );
     
-            Module._free(toneOffsetsPtr);
+            ft8lib.module._free(toneOffsetsPtr);
         } else {
             // Use default FT8 frequencies
-            result = Module._synth_gfsk_custom(
+            result = ft8lib.module._synth_gfsk_custom(
                 symbolsPtr, options.baseFrequency, 0, // Pass 0 for custom_tones when using default
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
                 n_start_delay, n_end_extension,
@@ -533,9 +471,9 @@ class FT8Message extends EventTarget {
             );
         }
     
-        const audio = new Float32Array(Module.HEAPF32.buffer, audioPtr, numSamples);
-        const dphi = new Float32Array(Module.HEAPF32.buffer, dphiPtr, numSamples);
-        const levels = new Float32Array(Module.HEAPF32.buffer, levelsPtr, numSamples);
+        const audio = new Float32Array(ft8lib.module.HEAPF32.buffer, audioPtr, numSamples);
+        const dphi = new Float32Array(ft8lib.module.HEAPF32.buffer, dphiPtr, numSamples);
+        const levels = new Float32Array(ft8lib.module.HEAPF32.buffer, levelsPtr, numSamples);
         this.audioSamples = Array.from(audio);
     
         const dphiArray = Array.from(dphi);
@@ -544,9 +482,9 @@ class FT8Message extends EventTarget {
         const levelsArray = Array.from(levels);
         this.levelsSamples = scaleToRange(levelsArray, 195, 5);
 
-        const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
-        const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
-        const metadataStr = Module.UTF8ToString(metadataJsonPtr, metadataLength);
+        const metadataLength = ft8lib.module.HEAP32[metadataLengthPtr / 4];
+        const metadataJsonPtr = ft8lib.module.HEAP32[metadataJsonPtrPtr / 4];
+        const metadataStr = ft8lib.module.UTF8ToString(metadataJsonPtr, metadataLength);
     
         try {
             this.metadata = JSON.parse(metadataStr);
@@ -555,124 +493,17 @@ class FT8Message extends EventTarget {
             console.error(error);
         } finally {
             // Free allocated memory
-            Module._free(symbolsPtr);
-            Module._free(audioPtr);
-            Module._free(dphiPtr);
-            Module._free(levelsPtr);
-            Module._free(metadataLengthPtr);
-            Module._free(metadataJsonPtrPtr);
-            Module._free(metadataJsonPtr);
+            ft8lib.module._free(symbolsPtr);
+            ft8lib.module._free(audioPtr);
+            ft8lib.module._free(dphiPtr);
+            ft8lib.module._free(levelsPtr);
+            ft8lib.module._free(metadataLengthPtr);
+            ft8lib.module._free(metadataJsonPtrPtr);
+            ft8lib.module._free(metadataJsonPtr);
         }
     }
 }
 
-function detectTelemetry(str) {
-    //exactly 18 hex digits, or start with T:
-    //note: first digit must be 0-8 if 18 digits. (not checked here)
-    const trimmed = str.trim().toUpperCase();
-    return (/^([0-9A-Fa-f][\s\-\:]?){18}$/.test(trimmed)) 
-//                || (/^[Tt](ELEMETRY)?:\s0*([0-9A-Fa-f][\s\-\:]?){1,18}$/.test(trimmed))
-          || (/^[Tt](ELEMETRY)?\s*:/.test(trimmed))
-          || (/\#T(ELEMETRY)?$/.test(trimmed))
-}
-
-function detectFreeTextBrackets(str) {
-    const trimmed = str.trim();
-    return (trimmed.startsWith('<') && trimmed.endsWith('>'));
-}
-
-function normalizeMessage(message) {
-    return message.trim().toUpperCase().replace(/\s+/g, ' ');
-}
-
-function normalizeMessageAndHashes(message) {
-    // replace contents of <...> with '<...>'
-    return message.trim().toUpperCase().replace(/\s+/g, ' ').replace(/<[^>]*>/g, '<...>');
-}
-
-function normalizeBracketedFreeText(input) {
-    return input.trim().replace(/^<|>$/g, '');
-}
-
-function normalizeSymbols(input) {
-    // numbers only
-    return input.replace(/[-\s]/g, '');
-}
-
-function normalizeBinary(input) {
-    // 0 and 1 only
-    return input.replace(/[-\s]/g, '');
-}
-
-function normalizePackedData(input) {
-    //return input.replace(/[-\s]/g, '').toUpperCase();
-    return input.replace(/[-\s]/g, '').toLowerCase();
-}
-
-function normalizeTelemetry(str) {
-    //exactly 18 hex digits, or start with T:
-    //note: first digit must be 0-8 if 18 digits. (not checked here)
-    
-    let trimmed = str.trim();
-    trimmed = trimmed.toUpperCase()
-        .replace(/^[Tt](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
-        .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
-        .replace(/[ \-\:]/g, '') // remove any space - :
-        .replace(/^[0]*/g, ''); // initial 0's
-    return trimmed;
-}
-
-function doDetectInputType(inputOriginal) {
-    const input = inputOriginal.trim();
-
-    if (detectFreeTextBrackets(input)) {
-        return 'free text'; // TODO: explicit free text vs assumed free text
-    }
-
-    if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
-        return '79 symbols';
-    }
-
-    if (/^[0-7]{58}$/.test(normalizeSymbols(input))) {
-        return '58 symbols';
-    }
-
-    // Check if input is hex string (packed data); pairs of hex must be together.
-    if (/^\s*([0-9A-Fa-f]{2}[-\s]?){10}\s*$/.test(input)) {
-        return 'packed';
-    }
-
-    if (detectTelemetry(input)) {
-        return 'telemetry';
-    }
-
-    const normBinary = normalizeBinary(input);
-    if (/^[0-1]+$/.test(normBinary)) {
-        if (normBinary.length === 77) {
-            return '77 bits'; // Source-encoded message, 77 bits
-        } else if (normBinary.length === 80) { // 77 bits + 3 bits zero padding
-            return '80 bits'; 
-        } else if (normBinary.length === 82) { // 77 bits + 5 bits zero padding (as used as input to CRC)
-            return '82 bits'; 
-        } else if (normBinary.length === 91) { // 77 + 14 bits
-            return '91 bits';
-        } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
-            return '174 bits'
-        } else if (normBinary.length === 237) { // 77 + 14 + 83 + 21*3
-            //const normBinary = '010001110000101100011';
-            const grayCosta = "011001100000110101010";
-            if (normBinary.startsWith(grayCosta) || normBinary.endsWith(grayCosta) || normBinary.slice(108, 129) == grayCosta) {
-                return '237 grits';
-            }
-            return '237 bits'
-        } else {
-            //TODO: warning
-        }
-    } 
-
-    // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
-    return 'default';
-}
 
 /**
  * @param {Array} numbers - array of numbers to scale
@@ -682,7 +513,7 @@ function doDetectInputType(inputOriginal) {
  */
 function scaleToRange(numbers, newMin, newMax) {
     const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
-    console.log("min/max:", originalMin, originalMax);
+    //console.log("min/max:", originalMin, originalMax);
     const scale = (newMax - newMin) / (originalMax - originalMin);
     
     return numbers.map(num => (num - originalMin) * scale + newMin);
@@ -700,16 +531,11 @@ function findMinAndMax(numbers) {
     return { min, max };
 }
 
-const inputTypeDescriptions = {
-    '77 bits': 'Payload data',
-    '80 bits': 'Payload data, extended with three zero bits',
-    '82 bits': 'Payload data, extended with five zero bits', // input to CRC calculations, according to FT4_FT8_QEX.pdf paper
-    '91 bits': 'Payload + CRC',
-    '174 bits': 'Payload + CRC + LDPC',
-    '237 bits': 'All symbols mapped to regular binary tribbles',
-    '237 grits': 'All symbols as their graycode triplets',
-    '58 symbols': 'FSK tone data without sync tones',
-    '79 symbols': 'Full FSK tone data',
-    'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
-    'default': 'FT8 message text',
+
+export { 
+    // needed
+    FT8Message,
+
+    // meh (probably internal)
+    scaleToRange, findMinAndMax
 };

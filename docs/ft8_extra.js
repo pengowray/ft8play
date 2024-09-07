@@ -1,19 +1,21 @@
+import { HamGridSquare } from './HamGridSquare.js'
+import { findHash } from "./ft8_hashmgr.js";
+import { getCty } from "./ctydata.js";
 
 // Free text character table
-const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
+export const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 
 // Costas array for sync
-const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
-const COSTAS_STR = '3140652';
+export const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
+export const COSTAS_STR = '3140652';
 
-const FTX_PAYLOAD_LENGTH_BYTES = 10;
-const FT8_NN = 79; // Total channel symbols
+export const FTX_PAYLOAD_LENGTH_BYTES = 10;
 
-const MAXGRID4 = 32400;
+export const MAXGRID4 = 32400;
 
 // Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
 // const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES] = [
-kFTX_LDPC_generator = [
+export const kFTX_LDPC_generator = [
     [ 0x83, 0x29, 0xce, 0x11, 0xbf, 0x31, 0xea, 0xf5, 0x09, 0xf2, 0x7f, 0xc0 ],
     [ 0x76, 0x1c, 0x26, 0x4e, 0x25, 0xc2, 0x59, 0x33, 0x54, 0x93, 0x13, 0x20 ],
     [ 0xdc, 0x26, 0x59, 0x02, 0xfb, 0x27, 0x7c, 0x64, 0x10, 0xa1, 0xbd, 0xc0 ],
@@ -100,7 +102,7 @@ kFTX_LDPC_generator = [
 ];
 
 // Parity check matrix (kFTX_LDPC_Nm)
-const LDPC_MATRIX = [
+export const LDPC_MATRIX = [
     [ 4, 31, 59, 91, 92, 96, 153 ],
     [ 5, 32, 60, 93, 115, 146, 0 ],
     [ 6, 24, 61, 94, 122, 151, 0 ],
@@ -187,7 +189,7 @@ const LDPC_MATRIX = [
 ];
 
 // Number of rows in each parity check (kFTX_LDPC_Num_rows)
-const LDPC_NUM_ROWS = [
+export const LDPC_NUM_ROWS = [
     7, 6, 6, 6, 7, 6, 7, 6, 6, 7, 6, 6, 7, 7, 6, 6,
     6, 7, 6, 7, 6, 7, 6, 6, 6, 7, 6, 6, 6, 7, 6, 6,
     6, 6, 7, 6, 6, 6, 7, 7, 6, 6, 6, 6, 7, 7, 6, 6,
@@ -196,33 +198,34 @@ const LDPC_NUM_ROWS = [
     6, 6, 6
 ];
 
-const ARRL_SEC = "AB AK AL AR AZ BC CO CT DE EB EMA ENY EPA EWA GA GTA IA ID IL IN KS KY LA LAX MAR MB MDC ME MI MN MO MS MT NC ND NE NFL NH NL NLI NM NNJ NNY NT NTX NV OH OK ONE ONN ONS OR ORG PAC PR QC RI SB SC SCV SD SDG SF SFL SJV SK SNJ STX SV TN UT VA VI VT WCF WI WMA WNY WPA WTX WV WWA WY".split(' ');
+export const ARRL_SEC = "AB AK AL AR AZ BC CO CT DE EB EMA ENY EPA EWA GA GTA IA ID IL IN KS KY LA LAX MAR MB MDC ME MI MN MO MS MT NC ND NE NFL NH NL NLI NM NNJ NNY NT NTX NV OH OK ONE ONN ONS OR ORG PAC PR QC RI SB SC SCV SD SDG SF SFL SJV SK SNJ STX SV TN UT VA VI VT WCF WI WMA WNY WPA WTX WV WWA WY".split(' ');
 
 // Gray code map (FTx bits -> channel symbols)
-const GRAY_MAP = [0, 1, 3, 2, 5, 6, 4, 7];
-const GRAY_INV = [0, 1, 3, 2, 6, 4, 5, 7];
-const GRAY_OFF = [0, 1, 2, 3, 4, 5, 6, 7];
+export const GRAY_MAP = [0, 1, 3, 2, 5, 6, 4, 7];
+export const GRAY_INV = [0, 1, 3, 2, 6, 4, 5, 7];
+export const GRAY_OFF = [0, 1, 2, 3, 4, 5, 6, 7];
 
 
-function symbolsToBitsStr(symbols) {
+export function symbolsToBitsStr(symbols) {
     return symbols.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
 }
 
-function symbolsToBitsStrPreserveSpaces(symbols) {
+export function symbolsToBitsStrPreserveSpaces(symbols) {
     return symbols.split('').map(s => (s === ' ') ? ' ' : GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
 }
 
-function symbolsToGrayBitsStr(symbols) {
+export function symbolsToGrayBitsStr(symbols) {
     return symbols.split('').map(s => parseInt(s).toString(2).padStart(3, '0')).join('');
 }
 
-function symbolsToBitsStrNoCosta(symbols) {
+export function symbolsToBitsStrNoCosta(symbols) {
+   if (symbols.length !== 79) throw new Error("Invalid symbols count");
    var symbolsWithoutCostas = symbols.slice(7, 36) + symbols.slice(43, 72);
    //return symbolsToBitsStr(symbolsWithoutCostas);
    return symbolsWithoutCostas.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
 }
 
-function bitsToSymbols(binaryString) {
+export function bitsToSymbols(binaryString) {
     let symbols = "";
     
     if (binaryString.length % 3 !== 0) throw new Error("Bad input to bitsToSymbols");
@@ -236,23 +239,23 @@ function bitsToSymbols(binaryString) {
 }
 
 
-function grayBitsToSymbols(graybits) {
+export function grayBitsToSymbols(graybits) {
     if (graybits.length % 3 !== 0) throw new Error("Bad input to grayBitsToSymbols");
 
     return graybits.match(/.{3}/g).map(b => parseInt(b, 2)).join('');
 }
 
-function binary237ToSymbols(binaryString) {
+export function binary237ToSymbols(binaryString) {
     return bitsToSymbols(binaryString);
 }
 
-function binary174ToSymbols(binaryString) {
+export function binary174ToSymbols(binaryString) {
     const sync = "3140652";
     //return sync.concat(bitsToSymbols(binaryString.slice(0, 29*3)).concat(sync).concat(bitsToSymbols( binaryString.slice(29*3, 58*3))).concat(sync);
     return `${sync}${bitsToSymbols(binaryString.slice(0, 29*3))}${sync}${bitsToSymbols(binaryString.slice(29*3, 58*3))}${sync}`;
 }
 
-function binary91ToSymbols(binaryString) { // 77 bits + CRC
+export function binary91ToSymbols(binaryString) { // 77 bits + CRC
     //const bits174 = binaryString.padEnd(174, '0')
     //const symbolsNoLDPC = binary174ToSymbols(bits174); 
 
@@ -263,7 +266,7 @@ function binary91ToSymbols(binaryString) { // 77 bits + CRC
 
 }
 
-function debugPrintMessageDetails(symbols) {
+export function debugPrintMessageDetails(symbols) {
     if (!symbols || symbols.length === 0) {
         console.log("No symbols to print.");
         return;
@@ -297,15 +300,15 @@ function debugPrintMessageDetails(symbols) {
     }
 }
 
-function symbolsPretty(symbols) {
+export function symbolsPretty(symbols) {
     return `${symbols.slice(0, 7)} ${symbols.slice(7, 36)} ${symbols.slice(36, 43)} ${symbols.slice(43, 72)} ${symbols.slice(72)}`
 }
 
-function symbolsToPrettyBinary(symbols) {
+export function symbolsToPrettyBinary(symbols) {
     return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
-function symbols58ToSymbols79(symbols) {
+export function symbols58ToSymbols79(symbols) {
     // adds missing costas
     if (symbols.length !== 58) {
         throw new Error("Invalid length (expected 58)");
@@ -314,13 +317,13 @@ function symbols58ToSymbols79(symbols) {
 }
 
  // z-base-32: permutation of the RFC3548 standard.
-const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
-const ZBASE32_Reverse = {};
+export const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
+export const ZBASE32_Reverse = {};
 for (let i = 0; i < ZBASE32.length; i++) {
     ZBASE32_Reverse[ZBASE32[i]] = i;
 }
 
-function bitsToZBase32(bits) {
+export function bitsToZBase32(bits) {
     if (bits.length % 5 !== 0) {
         throw new Error("Invalid length");
     }
@@ -331,7 +334,8 @@ function bitsToZBase32(bits) {
     }
     return result;
 }
-function hashBitsToZ32Dense(bits) { 
+
+export function hashBitsToZ32Dense(bits) { 
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
     }
@@ -353,7 +357,7 @@ function hashBitsToZ32Dense(bits) {
     }
 }
 
-function hashBitsPrettyZ32(bits) {
+export function hashBitsPrettyZ32(bits) {
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
     }
@@ -398,7 +402,7 @@ function hashBitsPrettyHex(bits) {
     }
 }
 
-function hashBitsPretty(bits) {
+export function hashBitsPretty(bits) {
     // 10, 12, or 22 bits
 
     // 0000000000 11 0000000000
@@ -417,7 +421,7 @@ function hashBitsPretty(bits) {
     return bits;
 }
 
-function hashBitsTo22styleBase10(bits) {
+export function hashBitsTo22styleBase10(bits) {
     // 22-bit hash in the style of hash22calc.exe (WSJT-X)
     // decimal value of the 22-bit hash, padded to 7 digits
     // does not make sense to use for 10 or 12-bit hashes
@@ -436,7 +440,7 @@ function hashBitsTo22styleBase10(bits) {
     return parseInt(bits, 2).toString().padStart(7, '0');
 }
 
-function checkSync(symbols) {
+export function checkSync(symbols) {
     if (symbols.length !== 79) {
         throw new Error("Input must be 79 characters (symbols) long");
     }
@@ -452,13 +456,22 @@ function checkSync(symbols) {
         }
     }
     
+    if (errors.length !== 0) {
+        //TODO: js8
+        //TODO: deeper dive
+        const js8oldIcos7a = "4256130"; // js8call old Beginning, Middle, End Costas 7x7 tone pattern
+        const js8newIcos7a = "0623541"; // Beginning Costas 7x7 tone pattern
+        const js8newIcos7b = "1502364"; // Middle Costas 7x7 tone pattern
+        const js8newIcos7c = "2506413"; // End Costas 7x7 tone pattern
+    }
+
     return {
         result: errors.length === 0 ? 'ok' : 'error',
         errors: errors // list of bad symbols
     };
 }
 
-function ftx_compute_crc(message, num_bits) {
+export function ftx_compute_crc(message, num_bits) {
     const FT8_CRC_WIDTH = 14;
     const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
     const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
@@ -485,7 +498,7 @@ function ftx_compute_crc(message, num_bits) {
     return remainder & ((TOPBIT << 1) - 1);
 }
 
-function checkCRC(symbols) {
+export function checkCRC(symbols) {
     let bitString = symbolsToBitsStrNoCosta(symbols);
     let msgBits = bitString.slice(0, 77).padEnd(82, '0').split('').map(Number);
     
@@ -505,7 +518,7 @@ function checkCRC(symbols) {
     };
 }
 
-function checkParity(symbols) {
+export function checkParity(symbols) {
     let bits = symbolsToBitsStrNoCosta(symbols).slice(0, 174).split('').map(Number);  // We need all 174 bits
     
     let failedParityBits = new Set();
@@ -542,7 +555,7 @@ function checkParity(symbols) {
     };
 }
 
-function calculateParity(binaryString) {
+export function calculateParity(binaryString) {
     if (binaryString.length !== 91) {
         throw new Error("Input must be 91 bits long (77 message bits + 14 CRC bits)");
     }
@@ -582,7 +595,7 @@ function calculateParity(binaryString) {
 }
 
 //TODO: roll this into calculateParity
-function analyzeNumbers(numbers) {
+export function analyzeNumbers(numbers) {
     // Count occurrences of each number
     const frequencyMap = new Map();
     for (const num of numbers) {
@@ -607,7 +620,7 @@ function analyzeNumbers(numbers) {
     };
 }
 
-function repairErrorsOnce(codewordBits, parityCheck) {
+export function repairErrorsOnce(codewordBits, parityCheck) {
     // naively repair codeword by flipping the most frequent error bits in the LDPC parity check
     // does not check if repair leads to parity check passing
     
@@ -617,7 +630,6 @@ function repairErrorsOnce(codewordBits, parityCheck) {
         if (flip.has(index)) return element === '0' ? '1' : '0';
         return element;
     }).join('');
-        console.log('flip:', flip, 'flipped:', flipped);
     return flipped;
 }
 
@@ -648,7 +660,7 @@ function decodeFT8FreeTextPayload(payload) {
 }
 
 // Convert 71 bits of free text to a string
-function bitsToText(bits) {
+export function bitsToText(bits) {
     if (bits.length !== 71) throw new Error("Free text must be 71 bits");
     
     let text = "";
@@ -668,8 +680,7 @@ function bitsToText(bits) {
 // Example usage
 //const payload = new Uint8Array([0x17, 0x6C, 0x5D, 0xB8, 0x73, 0x7F, 0x8A, 0x49, 0x30, 0x00]);
 //console.log(decodeFT8FreeText(payload));
-
-function encodeFT8FreeText(message) {
+export function encodeFT8FreeText(message) {
   const MAX_LEN = 13;
   // Ensure the message is no longer than 13 characters
   message = message.slice(0, MAX_LEN).toUpperCase();
@@ -692,7 +703,14 @@ function encodeFT8FreeText(message) {
   // Convert to 71-bit binary string
   let binaryString = result.toString(2).padStart(71, '0');
 
-  // message type 0.0 (6 bits) + 3 bits padding to get to 80
+
+  // message type 0.0 (6 bits)
+  binaryString += '000000';
+
+  return binaryString;
+
+  /*
+  message type 0.0 (6 bits) + 3 bits padding to get to 80
   binaryString = binaryString + '000000000';
 
   // Convert binary string to Uint8Array
@@ -700,15 +718,19 @@ function encodeFT8FreeText(message) {
   for (let i = 0; i < 10; i++) {
     output[i] = parseInt(binaryString.slice(i * 8, (i + 1) * 8), 2);
   }
-  
   return output;
+  */
+
 }
 
 // Encode hex to 71-bits of telemetry data in a 77-bit payload
-function encodeFT8Telemetry(telemetryHex) {
+export function encodeFT8Telemetry(telemetryHex) {
   
-  if (!/^[0-9A-Fa-f]{1,18}$/.test(telemetryHex)) {
-    return { "error": "Telemetry data must be a 1 to 18 character hex string" };
+  //if (!/^[0-9A-Fa-f]{1,18}$/.test(telemetryHex)) {
+  if (!/^[0-9A-Fa-f]*$/.test(telemetryHex)) {
+    return { "error": `Invalid character(s) found in telemetry data. Must contain only hex values (0 to F).` };
+  } else if (telemetryHex.length > 18 || telemetryHex.length < 1) {
+    return { "error": `Telemetry data must be a 1 to 18 hex character string. Found ${telemetryHex.length} hex characters. (May exclude leading zeros)` };
   }
 
   let binaryString = hexToBinary(telemetryHex); // leading 0's are trimmed
@@ -725,7 +747,7 @@ function encodeFT8Telemetry(telemetryHex) {
 }
 
 // Decode 71-bit telemetry data (untested; done by ft8_lib already)
-function decodeFT8Telemetry(payload) {
+export function decodeFT8Telemetry(payload) {
   if (!(payload instanceof Uint8Array) || payload.length !== 10) {
     throw new Error("Invalid payload: must be a Uint8Array of length 10");
   }
@@ -745,7 +767,7 @@ function decodeFT8Telemetry(payload) {
   return telemetryHex;
 }
 
-function telemetryBitsToText(bits) {
+export function telemetryBitsToText(bits) {
     if (bits.length !== 71) throw new Error("Telemetry must be 71 bits");
 
     // pad the start
@@ -761,7 +783,7 @@ function telemetryBitsToText(bits) {
     return hexString;
 }
 
-function telemetryBitsToByteText(bits) {
+export function telemetryBitsToByteText(bits) {
     bits = bits.padStart(Math.ceil(bits.length / 4) * 4, '0');
     
     let hexString = '';
@@ -775,7 +797,7 @@ function telemetryBitsToByteText(bits) {
     return hexString;
 }
 
-function telemetryByteAnnotations() {
+export function telemetryByteAnnotations() {
     const skipOnFirst = 1;
     const totalLen = 71;
     let annotations = [];
@@ -791,22 +813,22 @@ function telemetryByteAnnotations() {
     return annotations;
 }
 
-function packedToHexStr(packedData) {
+export function packedToHexStr(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function packedToHexStrSp(packedData) {
+export function packedToHexStrSp(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
 }
 
-function packedDataTo80Bits(packedData) {
+export function packedDataTo80Bits(packedData) {
     if (packedData.length !== 10) {
         throw new Error("Invalid packed data: must be a Uint8Array of length 10");
     }
     return Array.from(packedData).map(b => b.toString(2).padStart(8, '0')).join('');
 }
 
-function bitsToHexForTelemetry(binaryStr) {
+export function bitsToHexForTelemetry(binaryStr) {
     // Pad the binary string to ensure its length is a multiple of 4
     // not sure if it should be start or end?
     binaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
@@ -821,8 +843,7 @@ function bitsToHexForTelemetry(binaryStr) {
     return hexString;
 }
 
-
-function bitsToHex(binaryStr) {
+export function bitsToHex(binaryStr) {
     // Pad the binary string to ensure its length is a multiple of 4
     binaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
     
@@ -836,15 +857,24 @@ function bitsToHex(binaryStr) {
     return hexString;
 }
 
-
-function bitsToPacked(bitString) {
+export function bitsToPacked(bitString) {
     if (bitString.length != 80 && bitString.length != 77) {
         throw new Error("Invalid length to pack: must be 77 or 80 bits");
     }
-    const bits = normalizeBinary(bitString).padEnd(80, '0');
 
+    const bits = bitString.replace(/[-\s]/g, '').padEnd(80, '0');
     return Uint8Array.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
 }
+
+export function hexToPacked(hexString) { 
+    if (hexString.length != 20) {
+        throw new Error("Invalid length to pack: must be 10 bytes (20 hex characters)");
+    }
+
+    return Uint8Array.from(hexString.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+    //return new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+}
+
 
 // Helper function to convert hex string to binary string
 function hexToBinary(hex) {
@@ -853,7 +883,7 @@ function hexToBinary(hex) {
   ).join('').replace(/^0*/g, '');
 }
 
-function arrayToSymbols(toneArray) {
+export function arrayToSymbols(toneArray) {
   // Convert the Uint8Array to a regular array of numbers
   const numbers = Array.from(toneArray);
   
@@ -864,7 +894,7 @@ function arrayToSymbols(toneArray) {
   return tones.join('');
 }
 
-function symbolsToArray(toneString) {
+export function symbolsToArray(toneString) {
   // Remove any whitespace and split the string into an array of characters
   const tones = toneString.replace(/\s/g, '').split('');
   
@@ -875,7 +905,7 @@ function symbolsToArray(toneString) {
   return new Uint8Array(arrayTones);
 }
 
-function symbolsToPackedData(symbolsText) {
+export function symbolsToPackedData(symbolsText) {
   // returns Uint8Array
 
   const messageBits = symbolsToBitsStrNoCosta(symbolsText).slice(0, 77).padEnd(80, '0');
@@ -896,7 +926,6 @@ function symbolsToPackedData(symbolsText) {
   return packedData;
 }
 
-
 /**
  * Extracts the FT8 message type from packed message data.
  * 
@@ -912,7 +941,7 @@ function symbolsToPackedData(symbolsText) {
  * @param {Uint8Array} packedData - The packed 77-bit message payload (10 bytes)
  * @returns {string} The extracted message type
  */
-function getFT8MessageType(packedData) {
+export function getFT8MessageTypeFromPacked(packedData) {
     if (!packedData || packedData.length < 10) {
         return "-";
     }
@@ -928,9 +957,29 @@ function getFT8MessageType(packedData) {
     return i3.toString();
 }
 
-function getFT8MessageTypeName(type) {
+export function getFT8MessageType(bits) {
+    const i3 = parseInt(bits.slice(74, 77), 2);
+    if (i3 === 0) {
+        const n3 = parseInt(bits.slice(71, 74), 2);
+        const type = `0.${n3}`;
+        if (type === "0.6") {
+            if (bits[49] == '1') { // j50 
+                return "wspr2"; // '--1'
+            } else if (bits[48] == '0') { // j49 'x00'
+                return "wspr1"; // '-00'
+            } else if (bits[47] == '0') { // j48
+                return "wspr3"; // '010'
+            }
+        }
+        return type;
+    }
+    return i3.toString();
+}
+
+
+export function getFT8MessageTypeName(type) {
     switch (type) {
-        case "0.0": return "Free text message";
+        case "0.0": return "Free text";
         case "0.1": return "DXpedition mode";
         case "0.2": return "Unknown / Reserved";
         case "0.3": return "Field Day";
@@ -945,36 +994,40 @@ function getFT8MessageTypeName(type) {
         case "5": return "EU VHF with 6-digit grid locator";
         case "6": return "Unknown / Reserved";
         case "7": return "Unknown / Reserved";
+        case "spp": return "Space Packet Protocol";
+        case "wspr1": return "WSPR 1";
+        case "wspr2": return "WSPR 2";
+        case "wspr3": return "WSPR 3";
         default: return "Unknown";
     }
 }
 
 
-function binaryToInt(binary) {
+export function binaryToInt(binary) {
     return parseInt(binary, 2);
 }
 
-function bitsToCall(bits) {
+export function bitsToCall(bits) {
     return  bitsToCallDetails(bits);
     
     //const details = bitsToCallDetails(bits);
     //return `${details.callsign} (${details.type})`;
 }
 
-const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
-
-function nchar(char, table) {
+export function nchar(char, table) {
     return table.indexOf(char);
 }
 
-function hashCallsign(callsign) {
+export function hashCallsign(callsign) {
+    const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
+
     let n58 = BigInt(0);
     const maxLength = Math.min(callsign.length, 11);
 
     for (let i = 0; i < maxLength; i++) {
         const j = nchar(callsign[i], FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
         if (j < 0) {
-            console.error("Invalid character in callsign: " + callsign[i]);
+            //console.error("Invalid character in callsign for hashing: " + callsign[i]);
             return null; // hash error (wrong character set)
         }
         n58 = (BigInt(38) * n58) + BigInt(j);
@@ -991,15 +1044,15 @@ function hashCallsign(callsign) {
     return n22;
 }
 
-function callsignToHashBits(bits) {
+export function callsignToHashBits(bits) {
     return hashCallsign(bits).toString(2).padStart(22, '0');
 }
 
 // Convert 28 bits to a callsign
-function bitsToCallDetails(bits, extraBit = "") {
+export function bitsToCallDetails(bits, extraBit = "") {
     if (bits.length !== 28 && bits.length !== 29) throw new Error("Callsign must be 28 or 29 bits");
 
-    extraOn = (bits.length === 29 && bits[28] === '1');
+    const extraOn = (bits.length === 29 && bits[28] === '1');
     bits = bits.slice(0, 28);
 
     const n = parseInt(bits, 2);
@@ -1123,24 +1176,19 @@ function bitsToCallDetails(bits, extraBit = "") {
     return result;
 }
 
-function callsignToCountry(call) {
-    if (typeof cty !== 'undefined' && cty) {
-        const countryDetails = cty.getCountryDetails(call);
-        if (countryDetails) {
-            return countryDetails.country;
-        }
-    }
-    return null;
+export function callsignToCountry(call) {
+    return callsignToCountryDetails(call)?.country;
 }
 
-function callsignToCountryDetails(call) {
-    if (typeof cty !== 'undefined' && cty) {
-        const countryDetails = cty.getCountryDetails(call);
-        return countryDetails;
-    }
-    return null;
-}
+export function callsignToCountryDetails(call) {
+    if (typeof getCty === 'undefined') return null;
 
+    const cty = getCty();
+    const countryDetails = cty.getCountryDetails(call);
+    //console.log('countryDetails:', countryDetails);
+
+    return countryDetails;
+}
 
 function hashMatchDetails(bits) {
     const match = findHash(bits);
@@ -1162,7 +1210,7 @@ function hashMatchDetails(bits) {
     return null;
 }
 
-function isGrid4(grid) {
+export function isGrid4(grid) {
     return grid.length === 4 &&
            grid[0] >= 'A' && grid[0] <= 'R' &&
            grid[1] >= 'A' && grid[1] <= 'R' &&
@@ -1170,7 +1218,7 @@ function isGrid4(grid) {
            grid[3] >= '0' && grid[3] <= '9';
 }
 
-function bitsToHash(bits) {
+export function bitsToHash(bits) {
 
     const matchDetails = hashMatchDetails(bits) ?? {};
 
@@ -1181,7 +1229,7 @@ function bitsToHash(bits) {
 
 
 // not used
-function grid4ToG15(input) {
+export function grid4ToG15(input) {
     if (isGrid4(input) && input !== 'RR73') {
         let j1 = (input.charCodeAt(0) - 'A'.charCodeAt(0)) * 18 * 10 * 10;
         let j2 = (input.charCodeAt(1) - 'A'.charCodeAt(0)) * 10 * 10;
@@ -1213,17 +1261,17 @@ function grid4ToG15(input) {
     }
 }
 
-function bitsToGrid4OrReportWithType(bits) {
+export function bitsToGrid4OrReportWithType(bits) {
     return bitsToGrid4OrReportDetails(bits);
     //const details = bitsToGrid4OrReportDetails(bits)
     //return `${details.result} (${details.type})`;
 }
 
-function bitsToGrid4OrReport(bits) {
+export function bitsToGrid4OrReport(bits) {
     return bitsToGrid4OrReportDetails(bits).result;
 }
 
-function bitsToGrid4OrReportDetails(bits) {
+export function bitsToGrid4OrReportDetails(bits) {
     if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
     
     const g15 = parseInt(bits, 2);
@@ -1240,7 +1288,7 @@ function bitsToGrid4OrReportDetails(bits) {
                String.fromCharCode('A'.charCodeAt(0) + j2) +
                j3.toString() +
                j4.toString(), subtype: 'Maidenhead locator' };
-        const latlon = latLonForGrid(ret.value);
+        const latlon = HamGridSquare.latLonForGrid(ret.value);
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
             desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token, but here has been encoded as a location.";
@@ -1297,7 +1345,7 @@ function bitsToGrid4OrReportDetails(bits) {
     }
 }
 
-function bitsToReport(bits) {
+export function bitsToReport(bits) {
     // r5 Report: -30 to +32, even numbers only
 
     if (bits.length !== 5) throw new Error("Report must be 5 bits");
@@ -1307,7 +1355,7 @@ function bitsToReport(bits) {
     return signalReportDetails(value, -30, 32);
 }
 
-function signalReportDetails(dbValue, min = null, max = null) {
+export function signalReportDetails(dbValue, min = null, max = null) {
 
     function formatToSigFigs(num, sigFigs) {
         if (num === 0) return '0';
@@ -1386,11 +1434,11 @@ function signalReportDetails(dbValue, min = null, max = null) {
     }
 }
 
-function calculatePowerRatioFromDb(dbValue) {
+export function calculatePowerRatioFromDb(dbValue) {
     return Math.pow(10, dbValue / 10);
 }
 
-function bitsToR2(bits) { // aka bitsToRR73
+export function bitsToR2(bits) { // aka bitsToRR73
     // 2 bits, 0 to 3
     if (bits.length !== 2) throw new Error("R2 must be 2 bits");
     //RRR, RR73, 73, or blank (but not in that order)
@@ -1403,7 +1451,7 @@ function bitsToR2(bits) { // aka bitsToRR73
     throw new Error("Invalid R2 bits");
 }
 
-function bitsToNonstandardCallDetails(bits, message) {
+export function bitsToNonstandardCallDetails(bits, message) {
     const callsign = bitsToNonstandardCall(bits);
     const hashBits = callsignToHashBits(callsign);
     const country = callsignToCountry(callsign);
@@ -1419,7 +1467,7 @@ function bitsToNonstandardCallDetails(bits, message) {
 }
 
 
-function bitsToNonstandardCall(bits) {
+export function bitsToNonstandardCall(bits) {
     const c = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/';
     let n58 = BigInt('0b' + bits);
     let callsign = '';
@@ -1433,12 +1481,12 @@ function bitsToNonstandardCall(bits) {
     return callsign.trim();
 }
 
-function bitsToFieldDayClass(bits) {
+export function bitsToFieldDayClass(bits) {
     //k3 Field Day Class: A, B, ... F
     return String.fromCharCode('A'.charCodeAt(0) + parseInt(bits, 2));
 }
 
-function bitsToARRLSection(bits) {
+export function bitsToARRLSection(bits) {
     if (bits.length !== 7) throw new Error("ARRL Section must be 7 bits");
     const n = parseInt(bits, 2);;
     if (n == 0) {
@@ -1453,7 +1501,7 @@ function bitsToARRLSection(bits) {
     return ARRL_SEC[i];
 }
 
-function bitsToTxDetailsLow(bits) {
+export function bitsToTxDetailsLow(bits) {
     // n4 Number of transmitters: 1-16
     if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
     const n = parseInt(bits, 2);
@@ -1461,7 +1509,7 @@ function bitsToTxDetailsLow(bits) {
     return { value: low, subtype: 'transmitter(s)'};
 }
 
-function bitsToTxDetailsHigh(bits) {
+export function bitsToTxDetailsHigh(bits) {
     // n4 Number of transmitters: 17-32
     if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
     const n = parseInt(bits, 2);
@@ -1469,7 +1517,7 @@ function bitsToTxDetailsHigh(bits) {
     return { value: high, subtype: 'transmitter(s)'};
 }
 
-function bitsToTxDetails(bits) {
+export function bitsToTxDetails(bits) {
     // n4 Number of transmitters: 1-16, 17-32
     if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
     const n = parseInt(bits, 2);
@@ -1478,7 +1526,7 @@ function bitsToTxDetails(bits) {
     return { value: low, short: low, long: `${low} or ${high}`, subtype: 'transmitter(s)', desc: `This value may refer to ${low} or ${high} transmitter(s)` };
 }
 
-function bitsToRST(bits) {
+export function bitsToRST(bits) {
     //r3 Report: 2-9, displayed as 529 – 599 or 52 - 59
     if (bits.length !== 3) throw new Error("RST must be 3 bits");
     const n = parseInt(bits, 2) + 2;
@@ -1489,7 +1537,7 @@ function bitsToRST(bits) {
 
 }
 
-function bitsToBigIntString(binaryString) {
+export function bitsToBigIntString(binaryString) {
     // convert bit string to an integer display.
     // works for long strings.
 
@@ -1535,7 +1583,7 @@ function addStrings(num1, num2) {
     return result;
 }
 
-function addUnderlineToHash(hashBits, numBitsToUnderline, classname = "call-highlighter") {
+export function addUnderlineToHash(hashBits, numBitsToUnderline, classname = "call-highlighter") {
     if (hashBits == null || hashBits.length == 0) return '';
 
     const zhash = hashBitsPrettyZ32(hashBits);
@@ -1563,3 +1611,39 @@ function addSpanToStart(str, charCount, classname) {
     
     return `<span class="${classname}">${spanContent}</span>${remainder}`;
   }
+  
+//export * from './ft8_extra.js';
+
+
+export const inputTypeDescriptions = {
+    '77 bits': 'Payload data',
+    '80 bits': 'Payload data, extended with three zero bits',
+    '82 bits': 'Payload data, extended with five zero bits', // input to CRC calculations, according to FT4_FT8_QEX.pdf paper
+    '91 bits': 'Payload + CRC',
+    '174 bits': 'Payload + CRC + LDPC',
+    '237 bits': 'All symbols mapped to regular binary tribbles',
+    '237 grits': 'All symbols as their graycode triplets',
+    '58 symbols': 'FSK tone data without sync tones',
+    '79 symbols': 'Full FSK tone data',
+    'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
+    'default': 'FT8 message text',
+};
+
+export function normalizeMessage(message) {
+    return message.trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+export function normalizeMessageAndHashes(message) {
+    // replace contents of <...> with '<...>'
+    return message.trim().toUpperCase().replace(/\s+/g, ' ').replace(/<[^>]*>/g, '<...>');
+}
+
+export function normalizeBracketedFreeText(input) {
+    // trim and remove brackets or quotes
+    if (input.startsWith('<') && input.endsWith('>')) {
+        return input.trim().replace(/^<|>$/g, '');
+    } else if (input.startsWith('"') && input.endsWith('"')) {
+        return input.trim().replace(/^"|"$|“|”/g, '');
+    }
+    return input.trim();
+}

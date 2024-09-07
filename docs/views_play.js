@@ -1,4 +1,6 @@
-class PlayBtnComponent extends Component {
+import { Component } from './views.js';
+
+export class PlayBtnComponent extends Component {
     constructor(index, container) {
         super(index, container); // index -2 for all messages
         this.countdownInterval = null;
@@ -23,12 +25,7 @@ class PlayBtnComponent extends Component {
      * @returns {FT8Message}
      */
     getCurrentMessage() {
-        return this.messageManager.getCurrentMessage() ?? this.message;
-    }
-
-    loadMessage() {
-        this.message = this.getCurrentMessage(); // this.messageManager.getMessage(this.index);
-        this.messageUpdate();
+        return this.message ?? this.messageManager?.getCurrentMessage();
     }
 
     stopped() {
@@ -101,7 +98,7 @@ class PlayBtnComponent extends Component {
     
 
     updateButtonState() {
-        const msg = this.getCurrentMessage();
+        const msg = this.getCurrentMessage(); // may be null
         const nowPlaying = this.viewManager.playingMessages;
         const anyPlaying = nowPlaying.size > 0;
         const isPlaying =  msg?.isPlaying ?? false;
@@ -251,3 +248,6 @@ function writeString(view, offset, string) {
         view.setUint8(offset + i, string.charCodeAt(i));
     }
 }
+
+//export { PlayBtnComponent, audioBufferToWav };
+//export default PlayBtnComponent;

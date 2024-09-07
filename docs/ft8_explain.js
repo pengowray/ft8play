@@ -1,4 +1,5 @@
-function explainFT8Message(text, msgType) {
+
+export function explainFT8Message(text, msgType) {
     if (text === "Decoding failed") {
         return '';
     }
@@ -9,7 +10,7 @@ function explainFT8Message(text, msgType) {
 
     const parts = text.trim().split(/\s+/);
     let explanation = '';
-    console.log(parts);
+    //console.log(parts); // [ "K1ABC", "W9XYZ", "RRR" ]
 
     function isSimpleCallsign(call) {
         return /^[A-Z0-9]{1,6}$/.test(call);
@@ -78,7 +79,13 @@ function explainFT8Message(text, msgType) {
             explanation += ' The message is the maximum length of 13 characters.';
         }
     } else if (msgType === '0.5') {
-        explanation = `This is a telemetry message containing hexadecimal digits: ${text.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
+        const digits = text.replace(/^0*/g, '');
+        if (digits.length > 0) {
+            explanation = `This is a telemetry message containing hexadecimal digits: ${text.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
+        } else {
+            explanation = `This is a telemetry message. The data is all zeros.`;
+        }
+        
     } else if (/^[0-9A-F]{4,18}$/.test(text) && /[A-F]/.test(text)) { // all hex digits with at least one A-F 
         explanation = `This message is made up of hexadecimal digits, but it is not of the telemetry message type.`;
     } else {

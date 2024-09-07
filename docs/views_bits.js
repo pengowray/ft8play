@@ -1,4 +1,9 @@
-class TribbleComponent extends Component {
+import { Component } from './views.js';
+import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
+import { symbolsToBitsStr, symbolsToGrayBitsStr, packedToHexStrSp, getFT8MessageTypeName, encodeFT8FreeText, packedDataTo80Bits, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity } from "./ft8_extra.js";
+import * as extra from "./ft8_extra.js";
+
+export class TribbleComponent extends Component {
     constructor(index, container) {
         super(index, container);
         this.gridContainer = null;
@@ -44,29 +49,24 @@ class TribbleComponent extends Component {
 
         if (!this.message || !this.message.packedData) return;
         
-        const message = this.message;
 
-        // old: //function updateOutput(result, inputType, originalInput) {
+        //const syncCheckResult = message.getSyncCheck();
+        //const crcCheckResult = message.getCRCCheck();
+        //const parityCheckResult = message.getParityCheck();
 
-        //console.log(packedData);
-        const packedData = message.packedData;
-
-        const syncCheckResult = message.getSyncCheck();
-        const crcCheckResult = message.getCRCCheck();
-        const parityCheckResult = message.getParityCheck();
-
-        const symbols = message.symbolsText;
-        const bits = symbolsToBitsStr(symbols);
-        const packed = packedToHexStrSp(packedData);
-
-        const messageType = message.ft8MessageType; // e.g. "0.0" or "3"
-        const messageInfo = getFT8MessageTypeName(messageType); // 
-
-        this.createGrid(symbols, bits, packed);
+        this.createGrid();
         this.addAnnotations();
     }
 
-    createGrid(symbols, bits, packed) {
+    createGrid() {
+        const message = this.message;
+        const packedData = message.packedData;
+        const symbols = message.symbolsText;
+        const bits = message.allBits ?? symbolsToBitsStr(symbols);
+        const packed = packedToHexStrSp(packedData);
+        const isFt8 = message.packetType == null || message.packetType === 'ft8';
+        if (!isFt8) this.rows = [ 'packed', 'bits', 'annotations']; // no symbols
+
         const totalColumns = symbols.length * 3;  // Each symbol corresponds to 3 bits
         this.gridContainer.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
         
@@ -99,7 +99,7 @@ class TribbleComponent extends Component {
                 rowElement.appendChild(spacer);
 
                 packed.split(' ').forEach((byte, index) => {
-                    rowElement.appendChild(this.createPackedElement(byte, index));
+                    rowElement.appendChild(this.createPackedElement(byte, index, isFt8));
                 });
             }
 
@@ -126,17 +126,22 @@ class TribbleComponent extends Component {
         return symbolElement;
     }
 
-    createPackedElement(packedByte, index) {
-        let bitspan = (index === 9) ? 5 : 8; // last byte is 5 bits (77 bits total)
+    createPackedElement(packedByte, index, isFt8 = true) {
+        let bitspan = isFt8 ? ((index === 9) ? 5 : 8) : 8; // last byte is 5 bits (77 bits total); unless not ft8
+        const offset = isFt8 ? 22 : 1;
         const packedElement = document.createElement('div');
         packedElement.className = 'packed';
         packedElement.textContent = packedByte;
         packedElement.dataset.index = index;
-        packedElement.style.gridColumn = `${index * 8 + 22} / span ${bitspan}`;
+        packedElement.style.gridColumn = `${index * 8 +  offset} / span ${bitspan}`;
         return packedElement;
     }
 
     addAnnotations() {
+        const message = this.message;
+        const ft8MessageType = message.ft8MessageType;
+        const payloadBits = message.allBits ?? message.bits;
+
         const annotationsRow1 = document.createElement('div');
         annotationsRow1.className = 'annotations-row1';
         annotationsRow1.style.display = 'contents';
@@ -158,21 +163,34 @@ class TribbleComponent extends Component {
         annotationsRow5.style.display = 'contents';
         let requireAnnotationsRow5 = false;
 
-        this.addAnnotation(annotationsRow1, 'sync', null, 0, 21);
-        this.addAnnotation(annotationsRow1, 'data', null, 21, 87);
-        this.addAnnotation(annotationsRow1, 'sync', null, 108, 21);
-        this.addAnnotation(annotationsRow1, 'data', null, 129, 87);
-        this.addAnnotation(annotationsRow1, 'sync', null, 216, 21);
+        let annoStart = 21;
+        if (message.packetType === 'spp') { 
+            annoStart = 0;
+            //this.addAnnotation(annotationsRow1, 'packet', null, 0, payloadBits.length);
 
-        this.addAnnotation(annotationsRow2, 'payload', null, 21, 77);
-        this.addAnnotation(annotationsRow2, 'crc', null, 98, 10);
-        this.addAnnotation(annotationsRow2, 'crc', null, 129, 4);
-        this.addAnnotation(annotationsRow2, 'parity', null, 133, 83);
+            
+            this.addAnnotation(annotationsRow1, 'Primary Header', null, 0, 48); // Packet Primary Header
+            this.addAnnotation(annotationsRow1, 'Secondary Header', null, 48, 32); // Packet Secondary Header
 
-        const message = this.message;
-        const ft8MessageType = message.ft8MessageType;
-        const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108);
+            this.addAnnotation(annotationsRow2, 'Packet ID', null, 3, 13);
+            this.addAnnotation(annotationsRow2, 'Packet Sequence Control', null, 16, 32);
 
+        } else {
+
+            this.addAnnotation(annotationsRow1, 'sync', null, 0, 21);
+            this.addAnnotation(annotationsRow1, 'data', null, 21, 87);
+            this.addAnnotation(annotationsRow1, 'sync', null, 108, 21);
+            this.addAnnotation(annotationsRow1, 'data', null, 129, 87);
+            this.addAnnotation(annotationsRow1, 'sync', null, 216, 21);
+
+            this.addAnnotation(annotationsRow2, 'ft8 payload', null, 21, 77);
+            this.addAnnotation(annotationsRow2, 'crc', null, 98, 10);
+            this.addAnnotation(annotationsRow2, 'crc', null, 129, 4);
+            this.addAnnotation(annotationsRow2, 'parity', null, 133, 83);
+        }
+        if (message.ft8MessageType.startsWith('wspr')) {
+            this.addAnnotation(annotationsRow2, 'wspr payload', null, 21, 50);
+        }
         const defs = annotationDefinitions[ft8MessageType];
         if (defs) {
             defs.forEach(annotationDef => {
@@ -181,12 +199,12 @@ class TribbleComponent extends Component {
                 const anno3_text = annotation.shortLabel ?? annotation.label ?? annotation.tag;
                 const anno3_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.tag}\nPosition in payload: ${annotation.start + 1} to ${annotation.start + annotation.length} bits`;
                 
-                this.addAnnotation(annotationsRow3, anno3_text, anno3_tooltip, 21 + annotation.start, annotation.length);
+                this.addAnnotation(annotationsRow3, anno3_text, anno3_tooltip, annoStart + annotation.start, annotation.length);
 
                 const anno4_text = annotation.short ?? annotation.value ?? annotation.long;
                 const anno4_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.long ?? annotation.value ?? annotation.short}\nRaw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})`;
         
-                this.addAnnotation(annotationsRow4, anno4_text, anno4_tooltip, 21 + annotation.start, annotation.length);
+                this.addAnnotation(annotationsRow4, anno4_text, anno4_tooltip, annoStart + annotation.start, annotation.length);
                 
                 // subdefinitons: used only for telemetry bytes right now
                 if (annotation.subdefs) {
@@ -195,8 +213,7 @@ class TribbleComponent extends Component {
                         const subanno = AnnotationDefGetAnnotation(subdef, payloadBits);
                         const subanno_text = subanno.short ?? subanno.value ?? subanno.long;
                         const subanno_tooltip = `${subanno.label ?? subanno.shortLabel ?? subanno.tag}\n${subanno.long ?? subanno.value ?? subanno.short}\nRaw bits (=integer): ${subanno.bits} (=${subanno.rawIntValue})`;
-                        console.log(subanno);
-                        this.addAnnotation(annotationsRow5, subanno_text, subanno_tooltip, 21 + subanno.start, subanno.length);
+                        this.addAnnotation(annotationsRow5, subanno_text, subanno_tooltip, annoStart + subanno.start, subanno.length);
                     });
                 }
             });
@@ -212,6 +229,7 @@ class TribbleComponent extends Component {
         if (requireAnnotationsRow5) this.gridContainer.appendChild(annotationsRow5);
 
     }
+
 
     addAnnotation(row, label, tooltip, start, len) {
         const annotation = document.createElement('div');
@@ -231,14 +249,14 @@ class TribbleComponent extends Component {
     highlightCurrentSymbol() {
         this.clearHighlights();
         const symbolsRow = this.gridContainer.querySelector('.symbols-row');
-        const bitsRow = this.gridContainer.querySelector('.bits-row');
+        //const bitsRow = this.gridContainer.querySelector('.bits-row');
         
         const currentSymbolElement = symbolsRow.children[this.currentSymbol];
         if (currentSymbolElement) {
             currentSymbolElement.classList.add('highlighted');
-            for (let i = this.currentSymbol * 3; i < this.currentSymbol * 3 + 3; i++) {
-                if (bitsRow.children[i]) bitsRow.children[i].classList.add('highlighted');
-            }
+            //for (let i = this.currentSymbol * 3; i < this.currentSymbol * 3 + 3; i++) {
+            //    if (bitsRow.children[i]) bitsRow.children[i].classList.add('highlighted');
+            //}
         }
     }
 
@@ -273,3 +291,5 @@ class TribbleComponent extends Component {
     initialUpdate() {
     }
 }
+
+//export default TribbleComponent;
