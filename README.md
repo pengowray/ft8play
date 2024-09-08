@@ -4,7 +4,7 @@
 
 I made this webpage which will pack text into an FT8 message and let you explore the resulting data, signals and audio. It's an experiment in information design, a way to learn about FT8, a tool to test and debug FT8 software, and if you're an amateur radio operator, you can use it to better understand what you're transmitting and receiving. It's also something I can point to and say 'I made this'.
 
-Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. Everything runs locally in a web page (it doesn't send inputs anywhere). The source code is plain javascript. It supports most FT8 message types with complete breakdowns of every field.
+Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. Everything runs locally in a web page (it doesn't send inputs anywhere). The majority of the source code is plain Javascript. It supports most FT8 message types with complete breakdowns of every field.
 
 I don't have plans to add audio decoding at this stage, though I do keep pondering the idea of building a full QSO-capable app that would run on a web browser on your phone, and connect to a radio through web serial.
 
@@ -70,6 +70,7 @@ Payload/symbol input formats: (for debugging or advanced uses)
 - [X] have suggestions for alternative encoding methods when available
 - [ ] save the user's call and grid in a cookie if they like
 - [ ] optimizations
+- [ ] update MSHV to latest + better test coverage for Qt string replacement code
 - [ ] FFT visualization
 - [ ] lots of other things, but it's largely working and has the basics, so I'm happy to leave it as is for now.
 
@@ -81,9 +82,9 @@ Software libraries and data sources used:
  - [D3 javascript library](https://d3js.org/) ([ISC](https://github.com/d3/d3/blob/main/LICENSE))
  - [HamGridSquare.js](https://gist.github.com/stephenhouser/4ad8c1878165fc7125cb547431a2bdaa) (MIT) by Paul Brewer KI6CQ
  - [AD1C's _Contest Country Files_](https://www.country-files.com/contest/) (MIT) — ft8play includes `CTY.CSV` <!-- (same format as Aether/KLog) -->to show the country of a callsign.
- - WSJT-X (GPLv3) — the original FT8 software by Joe Taylor K1JT and Steve Franke, K9AN. Although not used directly in this project, I have referenced the Fortran source, as have the authors of MSHV and FT8_lib. WSJT-X is the most widely used FT8 software and the reference implementation of the FT8 protocol.
+ - WSJT / WSJT-X (GPLv3) — the original FT8 software. Although not used directly in this project, I have referenced the Fortran source, as have the authors of MSHV and FT8_lib. WSJT-X is the most widely used FT8 software and is considered the reference implementation of the FT8 protocol.
  
- Thank you to the authors and contributors of these libraries and data sources, who have collectively made this project possible.
+Thank you to the authors and contributors of these libraries and data sources—Joe Taylor K1JT and Steve Franke K9AN, who developed the FT8 protocol and WSJT-X, Karlis Goba YL3JG who created ft8_lib, Christo LZ2HV who ported WSJTX to C++ and develops MSHV, Jim Reisert AD1C who maintains the Amateur Radio Country Files, and the many other contributors who have collectively made this project possible.
 
 ## How to contribute
 
@@ -91,9 +92,9 @@ Software libraries and data sources used:
    - [ ] The 'explainer', which explains the meaning of QSO text in plain English, could be expanded to cover more cases. It's a lot of if-then-else statements. The code is simple and easy to follow. It's in `ft8_explain.js`. Find QSOs where the explainer doesn't make sense and add a new case.
    - [ ] If you're more into audio visual stuff, you could try to add a spectrogram or waterfall display of the audio. See `views_viz.js`; [wavesurfer.js](https://wavesurfer.xyz/example/spectrogram/?scroll) looks good.
    - [ ] Or try to work out what kind of .wav files WSJT-X is expecting from file > open.
-   - [ ] Have you noticed this is just another to do list in second person?
    - [ ] If you're more of a mathematical or puzzle person, you could try porting or creating a solver for LDPC errors, and adding an interface to let ther user add a tab with the corrected message. So far there's a solver which attempts a single step of flipping the most wrong-looking bits.
-   - [ ] If you're interested in information design, you could try designing and implementing a visualization of the graycode to binary conversion process in the blocks of bits data view that I should probably label with a better name. The challenge is to make it difficult for the viewer to glance at the diagram and confuse the gray code for binary code.
+   - [ ] Have you noticed this is just a to do list in second person?
+   - [ ] If you're interested in information design, you could try designing and implementing a visualization of the graycode to binary conversion process in the blocks of bits data view that I should probably label with a better name. The challenge is to add gray code (the values of the symbols), so that when glancing at the diagram it is difficult to confuse the gray code and binary code.
    - [ ] If you want to force this tool to be something actually useful, you could try adding a way to decode FT8 audio.
    - [ ] If you're into messing with javascript, find a nice way to make the browser back button work within the tool, and make a url format for sharing messages.
    - [ ] If you're a developer of amateur radio software, learn to use [Git](https://en.wikipedia.org/wiki/Git).
@@ -104,8 +105,11 @@ Software libraries and data sources used:
 - All processing is done on your local machine or device. Your input is not sent anywhere.
 
 ## Licensing notes
-- Other than that from MSHV, all code is MIT licensed or similar. MSHV is GPLv3 (as is the WSJT-X code it is based on). If you reuse this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then your project can be MIT licensed.
-- My wrappers and additions to the MSHV code are also MIT licensed.
+- This project is Copyright 2024 Pengo Wray. It is dual licensed under GPLv3 and additionally, if used without the MSHV module, under [MIT](https://github.com/pengowray/ft8play/blob/main/LICENSE).
+- All code is MIT licensed with the exceptions of the D3.js library, which uses the MIT-like [ISC](https://github.com/d3/d3/blob/main/LICENSE); and the MSHV-based code, which is licensed under GPLv3 (as is the WSJT/WSJT-X code it is based on).
+- My wrapper code and additions to the MSHV code are also dual MIT and GPLv3 licensed ([github link](https://github.com/pengowray/MSHV/tree/wasm/wasm))
+- My additions to [ft8_lib](https://github.com/kgoba/ft8_lib), are MIT licensed, like the original ([github link](https://github.com/pengowray/ft8_lib/tree/wasm/wasm))
+- If you fork this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then you can follow the more relaxed MIT licensing.
 - If you fork this project, do not use my name or callsigns in the fork's name without permission, but do link back to this project.
 
 ## Where can I use VK3PGO's FT8 Player? 
