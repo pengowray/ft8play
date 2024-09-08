@@ -1,5 +1,5 @@
 import { Component } from './views.js';
-import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName }  from './ft8_extra.js';
+import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName, escapeHTML }  from './ft8_extra.js';
 import * as extra from "./ft8_extra.js";
 import { explainFT8Message } from './ft8_explain.js';
 import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
@@ -602,21 +602,6 @@ export class OutputComponent extends Component {
             </div>
         `;
     }
-}
-
-function escapeHTML(text) {
-    if (text == null) return '';
-    
-    const map = {
-        '<': '&lt;',
-        '>': '&gt;',
-        '&': '&amp;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.toString().replace(/[<>&"']/g, function(match) {
-        return map[match];
-    });
 }
 
 //export default OutputComponent;

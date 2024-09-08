@@ -1,14 +1,13 @@
 import { FT8Message } from './ft8_msg.js';
 import { inputToTabs } from './ft8_tabs.js';
 import { ViewManager } from './views.js';
-//import { VizComponent, PianoRollComponent, OutputComponent, TribbleComponent, PlayBtnComponent } from './components.js';
 import { VizComponent } from './views_viz.js';
 import { PianoRollComponent } from './views_piano.js';
 import { TribbleComponent } from './views_bits.js';
 import { OutputComponent } from './views_output.js';
 import { PlayBtnComponent } from './views_play.js';
 import { testInputs_ft8code, ft8_examples } from './ft8_tests.js';
-import { getFT8MessageTypeName } from './ft8_extra.js';
+import { getFT8MessageTypeName, escapeHTML } from './ft8_extra.js';
 import * as extra from './ft8_extra.js';
 
 const exampleMessages = [
@@ -439,7 +438,7 @@ function initializeUI() {
                     }
 
                     if (msg.bestDecodedResult?.success) { 
-                        tabButton.innerHTML = `<b>${msg.bestDecodedResult.decodedText}</b><br>${typeInfo}`;
+                        tabButton.innerHTML = `<b>${extra.escapeHTML(msg.bestDecodedResult.decodedText)}</b><br>${typeInfo}`;
                     } else {
                         tabButton.innerHTML = typeInfo;
                     }
