@@ -10,6 +10,6 @@ MSHV is written in C++ and uses the Qt framework. This port is a subset of the o
 
 https://github.com/pengowray/MSHV/
 
-The in the _wasm_ folder of the _wasm_ branch, this fork of MSHV contains modifications to support web assembly compilation of a part of MSHV. 
+The above github repository is a fork of MSHV, containing source code with modifications to support web assembly compilation of parts of the MSHV program. The relevant code is found in the _wasm_ folder of the _wasm_ branch. It contains emscripten compilation and testing scripts.
 
-The overall project follows WSJT-X and HSHV, with the source code available under the GPL v3.0. Additionally, the new and supporting source code (wrappers, tests and Qt replacement code), as well as the source code of [FT8 Player](https://pengowray.github.io/) is available under the MIT license.
+The FT8 Player project includes code from HSHV, and is as such, also available under the GPLv3. Additionally, the FT8 Player project and its source code, excluding MSHV modules and MSHV source code, are available under the MIT license. The MIT license also extends to the new and supporting source code for MSHV by Pengo Wray, such as wrappers, tests and Qt replacement code.
