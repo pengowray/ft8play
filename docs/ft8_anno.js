@@ -1,4 +1,4 @@
-import { getFT8MessageTypeName, bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2 } from './ft8_extra.js';
+import { getFT8MessageTypeName, bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToGrid6, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2, bitsToSerialOrStateProvinces } from './ft8_extra.js';
 
 export const def_i3n3 = { label: "Message Type", shortLabel:'type', tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
 export const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
@@ -95,7 +95,7 @@ export const annotationDefinitions = {
         { label: "Call B", tag:'c28', start: 29, length: 28, getValue: bitsToCall },
         { label: "R", tag:'R1', start: 57, length: 1, getValue: rReportFlag},
         { label: "Report", shortLabel:"RST", tag:'r3', start: 58, length: 3, getValue: bitsToRST },
-        { label: "Serial/State", tag:'s13', start: 61, length: 13, getValue: bitsToSerialOrState },
+        { label: "Serial/State", tag:'s13', start: 61, length: 13, getValue: bitsToSerialOrStateProvinces },
         def_i3
     ],
     "4": [ // Non-standard call: h12 c58 h1 r2 c1
@@ -324,16 +324,6 @@ function placeholderText(bits) {
     //return `${parseInt(bits, 2).toString()} (undecoded value)`;
     return `${bitsToBigIntString(bits).toString()} (undecoded value)`;
     
-}
-
-//TODO
-function bitsToGrid6(bits) {
-    return placeholder(bits);
-}
-
-//TODO
-function bitsToSerialOrState(bits) {
-    return placeholder(bits);
 }
 
 function bitsToSerial(bits) {

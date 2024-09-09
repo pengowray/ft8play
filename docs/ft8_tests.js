@@ -276,6 +276,12 @@ export const testInputs_ft8code = [
       "type": "4.",
       "symbols": "3140652 12320000026470717462032610755 3140652 73041016005003413426660204571 3140652"
     },
+    { // from FT4_FT8_QEX.pdf
+      "message": "<G4ABC> <PA9XYZ> R 570007 JO22DB",
+      "type": "5.",
+      "symbols": "3140652 13665172067730026162514322642 3140652 15503311223566473014467745175 3140652"
+
+    }
 ];
 
 //export { ft8_examples, testInputs_ft8code }

@@ -12,7 +12,7 @@ export const COSTAS_STR = '3140652';
 export const FTX_PAYLOAD_LENGTH_BYTES = 10;
 
 export const MAXGRID4 = 32400;
-
+export const MAXGRID6 = 18662400; // 18 * 18 * 10 * 10 * 24 * 24
 // Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
 // const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES] = [
 export const kFTX_LDPC_generator = [
@@ -199,6 +199,7 @@ export const LDPC_NUM_ROWS = [
 ];
 
 export const ARRL_SEC = "AB AK AL AR AZ BC CO CT DE EB EMA ENY EPA EWA GA GTA IA ID IL IN KS KY LA LAX MAR MB MDC ME MI MN MO MS MT NC ND NE NFL NH NL NLI NM NNJ NNY NT NTX NV OH OK ONE ONN ONS OR ORG PAC PR QC RI SB SC SCV SD SDG SF SFL SJV SK SNJ STX SV TN UT VA VI VT WCF WI WMA WNY WPA WTX WV WWA WY".split(' ');
+export const STATES_PROVINCES = "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY NB NS QC ON MB SK AB BC NWT NF LB NU YT PEI DC".split(' ');
 
 // Gray code map (FTx bits -> channel symbols)
 export const GRAY_MAP = [0, 1, 3, 2, 5, 6, 4, 7];
@@ -1345,6 +1346,59 @@ export function bitsToGrid4OrReportDetails(bits) {
     }
 }
 
+export function bitsToGrid6(bits) {
+    if (bits.length !== 25) throw new Error("Grid6 must be 25 bits");
+
+    let n = parseInt(bits, 2);
+    if (n == MAXGRID6) {
+         return { value: '', subtype: 'blank' };
+    } else if (n > MAXGRID6) {
+        return { value: n.toString(), subtype: 'unknown / reserved' };
+    }
+
+    let j1 = Math.floor(n / (18 * 10 * 10 * 24 * 24));
+    n %= 18 * 10 * 10 * 24 * 24;
+    
+    let j2 = Math.floor(n / (10 * 10 * 24 * 24));
+    n %= 10 * 10 * 24 * 24;
+    
+    let j3 = Math.floor(n / (10 * 24 * 24));
+    n %= 10 * 24 * 24;
+    
+    let j4 = Math.floor(n / (24 * 24));
+    n %= 24 * 24;
+    
+    let j5 = Math.floor(n / 24);
+    let j6 = n % 24;
+
+    if (j1 < 0 || j1 > 17 || j2 < 0 || j2 > 17 || 
+        j3 < 0 || j3 > 9 || j4 < 0 || j4 > 9 ||
+        j5 < 0 || j5 > 23 || j6 < 0 || j6 > 23) {
+        return { value: 'INVALID', subtype: 'error' };
+    }
+
+    let grid6 = 
+        String.fromCharCode('A'.charCodeAt(0) + j1) +
+        String.fromCharCode('A'.charCodeAt(0) + j2) +
+        j3.toString() + j4.toString() +
+        String.fromCharCode('a'.charCodeAt(0) + j5) +
+        String.fromCharCode('a'.charCodeAt(0) + j6);
+
+    let ret = { 
+        value: grid6,
+        subtype: 'Maidenhead locator' 
+    };
+
+    if (typeof HamGridSquare !== 'undefined' && HamGridSquare.latLonForGrid) {
+        const latlon = HamGridSquare.latLonForGrid(grid6);
+        ret.lat = Number(latlon.lat.toFixed(4));
+        ret.lon = Number(latlon.lon.toFixed(4));
+        ret.desc = `latitude, longitude: ${ret.lat}, ${ret.lon}`;
+    }
+
+    return ret;
+}
+
 export function bitsToReport(bits) {
     // r5 Report: -30 to +32, even numbers only
 
@@ -1500,6 +1554,22 @@ export function bitsToARRLSection(bits) {
     }
     return ARRL_SEC[i];
 }
+
+export function bitsToSerialOrStateProvinces(bits) {
+    //US States and Canadian Provinces
+    if (bits.length !== 13) throw new Error("Serial or State/Province must be 13 bits");
+    const n = parseInt(bits, 2);;
+    if (n == 8000) {
+        return { value: '', subtype: 'blank' };
+    } else if (n < 8000) {
+        return { value: n.toString(), subtype: 'serial number' };
+    } else if (n <= 8000 + STATES_PROVINCES.length) {
+        return { value: STATES_PROVINCES[n - 8001], subtype: 'state/province' };
+    } else {
+        return { value: n, subtype: 'undefined' };
+    }
+}
+
 
 export function bitsToTxDetailsLow(bits) {
     // n4 Number of transmitters: 1-16

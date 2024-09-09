@@ -251,6 +251,8 @@ export class TribbleComponent extends Component {
         const symbolsRow = this.gridContainer.querySelector('.symbols-row');
         //const bitsRow = this.gridContainer.querySelector('.bits-row');
         
+        if (!symbolsRow) return;
+
         const currentSymbolElement = symbolsRow.children[this.currentSymbol];
         if (currentSymbolElement) {
             currentSymbolElement.classList.add('highlighted');
