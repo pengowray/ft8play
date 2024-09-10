@@ -59,8 +59,6 @@ Payload/symbol input formats: (for debugging or advanced uses)
 
 ## Bugs
 - You have to hit generate again after adjusting any audio settings.
-- Not all information presented is correct.
-- The audio ramps are wrong, which is probably causing WSJT-X to not to decode the generated .wav files (though it decodes the audio signal consistantly when presented in other ways)
 
 ## To do
 - [ ] decode FT8 audio
