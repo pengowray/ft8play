@@ -46,6 +46,8 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
     switch (inputType) {
         case 'free':
         case 'free text':
+        case 'free text L':
+        case 'free text R':
             const freetextBits = extra.encodeFT8FreeText(input);
             message.initBits(freetextBits);
             return;
@@ -207,23 +209,35 @@ export function inputToTabs(inputOriginal, expectedResults = null) {
         }
     }
 
+    // print input types
+    console.log('Input types:', inputTypes);
+
     // Sort inputTypes by weight (high to low)
     const sortedTypes = Object.entries(inputTypes)
     .sort((a, b) => b[1] - a[1])
     .map(([type]) => type);
+
+    console.log('Sorted Input types:', sortedTypes);
 
     for (const type of sortedTypes) {
         if (inputTypes[type] > 0) {
             //const weight = inputTypes[type];
             const tab = { input: input, inputType: type };
 
+            console.log("start tab: ", type);
+
             let message = null;
             try {
                 const normalizedInput = normalizeType(input, type);
+                console.log(" - normalizedInput: ", normalizedInput);
+
                 message = new FT8Message(input)
+                console.log(" - message: ", message);
+
                 message.inputType = type;
                 message.normalizedInput = normalizedInput;
                 message.expectedResults = expectedResults;
+                console.log(" - init type: ", type);
                 initMessage(message, normalizedInput, type);
 
                 tabs.push(message);
@@ -231,10 +245,13 @@ export function inputToTabs(inputOriginal, expectedResults = null) {
             } catch (error) {
                 if (message !== null) {
                     message.encodeError = error.message;
-                    console.log(`Error encoding message: ${error.message}`);
+                    console.log(`Error encoding message (type:${type}, input:"${input}"): ${error.message}`);
                     console.trace(error);
                     //show error somewhere even if failed
                     tabs.push(message);
+                } else {
+                    console.log(`Null error encoding message [no tab to push] (type:${type}, input:"${input}"): ${error.message}`);
+                    console.trace(error);
                 }
             }
         }
@@ -264,6 +281,10 @@ export function normalizeType(input, type) {
         case 'free':
         case 'free text':
             return normalizeBracketedFreeText(input);
+        case 'free text L':
+            return extra.normalizeFreeTextL(input);
+        case 'free text R':
+            return extra.normalizeFreeTextR(input);
         case '79 symbols':
         case '58 symbols':
             return normalizeSymbols(input);
@@ -300,9 +321,16 @@ export function detectInputTypes(normalizedInput, inputOriginal) {
     const inputTypes = {}; // { 'type': weight, 'type2': weight, ... }
     
     if (detectFreeTextBrackets(input)) {
-        inputTypes['free text'] = 30; // 'free text'
+        // free text has brackets or quotes
+        inputTypes['free text'] = 30; // generally the same as 'free text R' -- unless it contains invalid characters, or if normalizeFreeTextR() tidies it up some other way to be different
+        inputTypes['free text L'] = 4; // generally the same as mshv's free text encoding
+        inputTypes['free text R'] = 3;
+
     } else {
-        inputTypes['free text'] = 5; // fallback free text
+         // fallback free text
+        inputTypes['free text'] = 5;
+        inputTypes['free text L'] = 4;
+        inputTypes['free text R'] = 3;
     }
 
     // ordinary message (todo: checks?)

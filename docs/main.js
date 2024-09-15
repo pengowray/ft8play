@@ -429,13 +429,12 @@ function initializeUI() {
                     typeInfo = typeInfo.slice(8);
                     if (typeInfo == 'ft8lib') typeInfo = 'ft8_lib';
                 }
-                
 
                 if (msg.packetType == 'spp') {
                     tabButton.innerHTML = `Space Packet Protocol 🛰<br>${typeInfo}`;
                 } else {
 
-                    if (msg.ft8MessageType && msg.inputType && !['free text', 'telemetry'].includes(msg.inputType)) {
+                    if (msg.ft8MessageType && msg.inputType && !['free text', 'free text L', 'free text R', 'telemetry'].includes(msg.inputType)) {
                         typeInfo += ' → ' + (extra.getFT8MessageTypeName(msg.ft8MessageType) || msg.ft8MessageType);
                     }
 

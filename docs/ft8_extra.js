@@ -1715,6 +1715,25 @@ export function normalizeMessageAndHashes(message) {
     return message.trim().toUpperCase().replace(/\s+/g, ' ').replace(/<[^>]*>/g, '<...>');
 }
 
+export function normalizeFreeTextL(input, len = 13) {
+    let norm = cleanFreetext(input);
+    if (norm.length > len) norm = norm.slice(0, len);
+    return norm.padEnd(len, ' ');
+}
+
+export function normalizeFreeTextR(input, len = 13) {
+    let norm = cleanFreetext(input);
+    if (norm.length > len) norm = norm.slice(-len);
+    return norm.padStart(len, ' ');
+}
+
+export function cleanFreetext(input) {
+    // remove chars not in FT8_CHAR_TABLE_FULL and replace with space
+    var replaced = input.replace(/[^ 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+\-./?]/g, ' ');
+    // remove double spaces and trim
+    return replaced.replace(/\s+/g, ' ').trim();
+}
+
 export function normalizeBracketedFreeText(input) {
     // trim and remove brackets or quotes
     if (input.startsWith('<') && input.endsWith('>')) {
