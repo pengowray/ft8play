@@ -427,7 +427,9 @@ function initializeUI() {
                 let typeInfo = msg.inputType;
                 if (typeInfo != null && typeInfo.startsWith('default/')) {
                     typeInfo = typeInfo.slice(8);
+                    if (typeInfo == 'ft8lib') typeInfo = 'ft8_lib';
                 }
+                
 
                 if (msg.packetType == 'spp') {
                     tabButton.innerHTML = `Space Packet Protocol 🛰<br>${typeInfo}`;
