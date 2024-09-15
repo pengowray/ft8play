@@ -35,6 +35,42 @@ To transmit FT8 farther than the bluetooth speaker connected to your phone you'l
 - Developers of FT8 software, who might appreciate the ability to quickly check the validity and content of codewords, symbols, hex or binary payloads, etc.
 - The future. Eventually it would be fun to make a fully functional FT8 QSO app which runs in the browser, with logging and and CAT control for various radios (via the web serial API), but that's some way away and would be a huge time sink so I'm trying not to think about it.
 
+## Motiviation
+
+ Initially the purpose was an experiment, to see if it was possible to
+bring an existing FT8 library (written in C or C++) to the browser
+(and to learn how to do that) and also for me to learn the inner
+workings of FT8 which I was curious about.
+
+The purpose changed to being more about [information design](https://en.wikipedia.org/wiki/Information_design), 
+to show the details of FT8 in an effective way, so others can learn more quickly. I thought people
+might enjoy seeing all the pieces that are packed into the 77 bits (or 79 symbols) of
+the FT8 message. It is not perfect, and there is always more work to
+do in showing it more clearly and fully.
+
+I also made it so you can use it to craft FT8 messages to TX (or
+create audio files).
+
+I would like to be able to use it to examine received FT8 messages
+from other software in more detail, but the logged data of all FT8
+software (that I've tried) does not save enough information (only the
+text, not the symbols or raw data).
+
+So mostly it is to show how FT8 works, and a proof of concept, and
+perhaps there are other uses if you need to quickly make an FT8
+message to transmit on SSB. I am interested if people find a use. I'd
+also like to add other protocols in future. An audio decoder is
+possible in the future (OpenWebRX / KiwiSDR is already doing this in
+the browser)
+
+In the future maybe it could make something which can be used to make
+a full QSO (TX and RX). I think I would need other interested
+developers before doing that. But with this project I am already 90%
+of the way to a prototype which can do a full FT8 QSO in a web browser
+(i.e. without installing any software, working on all platforms,
+including mobile, and all operating systems. I think this is an
+exciting possibility. Just the other 90% of the work is left to do.
+
 ## What things are in the UI
 
 - Lots of stuff now that I haven't documented, so you'll have to explore.
@@ -59,11 +95,10 @@ Payload/symbol input formats: (for debugging or advanced uses)
 
 ## Bugs
 - You have to hit generate again after adjusting any audio settings.
-- Not all information presented is correct.
-- The audio ramps are wrong, which is probably causing WSJT-X to not to decode the generated .wav files (though it decodes the audio signal consistantly when presented in other ways)
 
 ## To do
 - [ ] decode FT8 audio
+- [ ] clean up this documentation
 - [X] fully support decoding of all ft8 message types
 - [X] fully support encoding of all ft8 message types
 - [ ] superfox mode
@@ -110,7 +145,7 @@ Thank you to the authors and contributors of these libraries and data sources—
 - My wrapper code and additions to the MSHV code are also dual MIT and GPLv3 licensed ([github link](https://github.com/pengowray/MSHV/tree/wasm/wasm))
 - My additions to [ft8_lib](https://github.com/kgoba/ft8_lib), are MIT licensed, like the original ([github link](https://github.com/pengowray/ft8_lib/tree/wasm/wasm))
 - If you fork this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then you can follow the more relaxed MIT licensing.
-- If you fork this project, do not use my name or callsigns in the fork's name without permission, but do link back to this project.
+- If you fork this project, do not use my name or callsigns in the fork's name without permission, but do link back to [VK3PGO FT8 Player](https://github.com/pengowray/ft8play).
 
 ## Where can I use VK3PGO's FT8 Player? 
 - [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/) — FT8 Player live in your browser.
