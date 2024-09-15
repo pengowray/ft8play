@@ -88,7 +88,7 @@ export function addHashesFromInput(inputText) {
 }
 
 let defaultsAdded = false;
-export const defaultHashes = ['', 'K1JT', 'K9AN', 'N0CALL', 'QU1RK', 'W1AW', 'CQ', 'VK3PGO', 'AA9GO', 'DEMO', 'D3MO', 'DEM0', 'D3M0', 'A1AAA', 'XX9XXX', 'EXAMPLE', 'CALLSIGN', 'CALLSIGN1', 'TEST', 'TEST1', 'TE1ST', 'TE0ST', 'TESTCALL', 'TESTCALL1', 'TEST1CALL', 'W3XYZ', 'K5ABC', 'VE3XXX', 'N1ZZZ', 'DL0ABC', 'VK2XYZ', 'ZL1AAA', 'JA1XXX', 'M0ABC', 'IT9XXX', 'ERROR', 'ERR0R', 'NONE', 'N0NE', 'NUL', 'NULL', 'NIL', 'EMPTY', 'F0X', 'FOX', 'SUPERFOX', 'SUP3RFOX', 'SUPERF0X' ];
+export const defaultHashes = ['', 'K1JT', 'K9AN', 'N0CALL', 'QU1RK', 'W1AW', 'CQ', 'VK3PGO', 'AA9GO', 'CA0LL', 'OT7ER', 'DEMO', 'D3MO', 'DEM0', 'D3M0', 'A1AAA', 'XX9XXX', 'EXAMPLE', 'CALLSIGN', 'CALLSIGN1', 'TEST', 'TEST1', 'TE1ST', 'TE0ST', 'TESTCALL', 'TESTCALL1', 'TEST1CALL', 'W3XYZ', 'K5ABC', 'VE3XXX', 'N1ZZZ', 'DL0ABC', 'VK2XYZ', 'ZL1AAA', 'JA1XXX', 'M0ABC', 'IT9XXX', 'ERROR', 'ERR0R', 'NONE', 'N0NE', 'NUL', 'NULL', 'NIL', 'EMPTY', 'F0X', 'FOX', 'SUPERFOX', 'SUP3RFOX', 'SUPERF0X' ];
 function addDefaultHashes() {
     defaultsAdded = true; // set this early to stop recursion
     if (defaultsAdded) return;

@@ -1,4 +1,4 @@
-import { getFT8MessageTypeName, bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToGrid6, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2, bitsToSerialOrStateProvinces } from './ft8_extra.js';
+import { getFT8MessageTypeName, bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToGrid6, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2, bitsToR2Details, bitsToSerialOrStateProvinces } from './ft8_extra.js';
 
 export const def_i3n3 = { label: "Message Type", shortLabel:'type', tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
 export const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
@@ -102,7 +102,7 @@ export const annotationDefinitions = {
         { label: "Hash", tag:'h12', start: 0, length: 12, getValue: bitsToHash },
         { label: "Call", tag:'c58', start: 12, length: 58, getValue: bitsToNonstandardCallDetails },
         { label: "Sender field", shortLabel: "h", tag: 'h1', start: 70, length: 1, getValue: callOrderFlag },
-        { label: "Signoff", tag:'r2', start: 71, length: 2, getValue: bitsToR2 },
+        { label: "Signoff", tag:'r2', start: 71, length: 2, getValue: bitsToR2Details },
         { label: "CQ", tag:'c1', start: 73, length: 1, getValue: (bit) => bit === '1' ? '1 (First callsign is CQ. Ignore hash)' : '0' },
         def_i3
     ],

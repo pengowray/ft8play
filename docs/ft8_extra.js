@@ -1492,6 +1492,13 @@ export function calculatePowerRatioFromDb(dbValue) {
     return Math.pow(10, dbValue / 10);
 }
 
+export function bitsToR2Details(bits) { 
+    //TODO: if it's a CQ message, note that it's always blank for CQ
+    if (bits == '00') return { 'value': '', 'subtype': 'blank', 'desc': 'Other possible values: RRR, RR73, 73' };
+    return { value: bitsToR2(bits) };
+}
+
+
 export function bitsToR2(bits) { // aka bitsToRR73
     // 2 bits, 0 to 3
     if (bits.length !== 2) throw new Error("R2 must be 2 bits");
@@ -1502,7 +1509,7 @@ export function bitsToR2(bits) { // aka bitsToRR73
     if (bits === '10') return 'RR73';
     if (bits === '11') return '73';
 
-    throw new Error("Invalid R2 bits");
+    throw new Error("Invalid R2");
 }
 
 export function bitsToNonstandardCallDetails(bits, message) {

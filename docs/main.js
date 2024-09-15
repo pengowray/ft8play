@@ -16,7 +16,7 @@ const exampleMessages = [
     "W9XYZ K1ABC R-17",
     "K1ABC W9XYZ RRR",
     "W9XYZ K1ABC 73",
-    "<TNX BOB 73 GL>"
+    "TNX BOB 73 GL"
 ];
 
 function initializeUI() {
