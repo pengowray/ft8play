@@ -140,12 +140,15 @@ Thank you to the authors and contributors of these libraries and data sources—
 - All processing is done on your local machine or device. Your input is not sent anywhere.
 
 ## Licensing notes
-- This project is Copyright 2024 Pengo Wray. It is dual licensed under GPLv3 and additionally, if used without the MSHV module, under [MIT](https://github.com/pengowray/ft8play/blob/main/LICENSE).
-- All code is MIT licensed with the exceptions of the D3.js library, which uses the MIT-like [ISC](https://github.com/d3/d3/blob/main/LICENSE); and the MSHV-based code, which is licensed under GPLv3 (as is the WSJT/WSJT-X code it is based on).
-- My wrapper code and additions to the MSHV code are also dual MIT and GPLv3 licensed ([github link](https://github.com/pengowray/MSHV/tree/wasm/wasm))
-- My additions to [ft8_lib](https://github.com/kgoba/ft8_lib), are MIT licensed, like the original ([github link](https://github.com/pengowray/ft8_lib/tree/wasm/wasm))
+- This project is Copyright 2024 Pengo Wray. It is licensed under under the [MIT license](https://github.com/pengowray/ft8play/blob/main/LICENSE), with the exception of the MSHV module (licensed under GPLv3, as is the WSJT/WSJT-X code it is based on), and the D3.js library (which uses the MIT-like [ISC license](https://github.com/d3/d3/blob/main/LICENSE)). You may also optionally treat the entire project as GPLv3 if it is compatibile with all library licenses.
+- The original/unmodified MSHV code is licensed under GPLv3. My wrapper code and additions to the MSHV code are dual licensed as MIT and GPLv3.
+  - https://github.com/pengowray/MSHV/tree/wasm/wasm — the forked MSHV codebase which has been modified to support building a WASM module for ft8play
+  - It is cloned and forked from [MSHV Amateur Radio Software](http://lz2hv.org/mshv) by LZ2HV, which has its [source code on sourceforge](https://sourceforge.net/projects/mshv/).
+- My additions to ft8_lib are MIT licensed, matching the original source and other code of this project (ft8play)
+  - https://github.com/pengowray/ft8_lib/tree/wasm/wasm — the modified ft8_lib codebase (MIT) which supports building a WASM module for ft8play
+  - It is forked from the original ft8_lib project: https://github.com/kgoba/ft8_lib
 - If you fork this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then you can follow the more relaxed MIT licensing.
-- If you fork this project, do not use my name or callsigns in the fork's name without permission, but do link back to [VK3PGO FT8 Player](https://github.com/pengowray/ft8play).
+- If you fork this project, **do not** use my name or callsigns in the fork's name without permission, but **do** link back to [VK3PGO FT8 Player](https://github.com/pengowray/ft8play).
 
 ## Where can I use VK3PGO's FT8 Player? 
-- [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/) — FT8 Player live in your browser.
+- [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/) — Pengo Wray's ft8play: FT8 Player live in your browser.
