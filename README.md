@@ -4,7 +4,7 @@
 
 I made this webpage which will pack text into an FT8 message and let you explore the resulting data, signals and audio. It's an experiment in information design, a way to learn about FT8, a tool to test and debug FT8 software, and if you're an amateur radio operator, you can use it to better understand what you're transmitting and receiving. It's also something I can point to and say 'I made this'.
 
-Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. Everything runs locally in a web page (it doesn't send inputs anywhere). The majority of the source code is plain Javascript. It supports most FT8 message types with complete breakdowns of every field.
+Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap and extend the libraries to allow the output to be visualized in FT8 Player. Everything runs locally in a web page. The majority of the source code is plain Javascript. It supports most FT8 message types with a complete breakdown of every field.
 
 I don't have plans to add audio decoding at this stage, though I do keep pondering the idea of building a full QSO-capable app that would run on a web browser on your phone, and connect to a radio through web serial.
 
@@ -12,12 +12,12 @@ Any feedback welcome. Let me know if you find some use for it or want to help de
 
 **[Open FT8 Player](https://pengowray.github.io/ft8play/)**
 
-Pengo VK3PGO
+Pengo Wray VK3PGO
 
 
 ## How it works
 
-Enter a short message, press encode, see it encoded, play the FT8 audio on your speaker or into your radio transceiver if you like. Pick one of the pre-made messages (near the bottom) if you just want to test it out.
+Enter a short message, press encode, see it encoded, play the FT8 audio on your speaker or into your radio transceiver if you like. Or pick one of the pre-made messages (near the bottom) if you just want to test it out.
 
 ## What even is FT8?
 
@@ -37,44 +37,44 @@ To transmit FT8 farther than the bluetooth speaker connected to your phone you'l
 
 ## Motiviation
 
- Initially the purpose was an experiment, to see if it was possible to
+Initially the purpose was an experiment, to see if it was possible to
 bring an existing FT8 library (written in C or C++) to the browser
 (and to learn how to do that) and also for me to learn the inner
 workings of FT8 which I was curious about.
 
 The purpose changed to being more about [information design](https://en.wikipedia.org/wiki/Information_design), 
-to show the details of FT8 in an effective way, so others can learn more quickly. I thought people
-might enjoy seeing all the pieces that are packed into the 77 bits (or 79 symbols) of
-the FT8 message. It is not perfect, and there is always more work to
-do in showing it more clearly and fully.
+to show the details of FT8 in an effective way, so its inner workings might be more immediately understandable or at least explorable. 
+I thought someone might enjoy seeing all the pieces that are packed into the 79 tones of
+an FT8 message. It still far from perfect. There's many possible improvements possible to make the meaning 
+and encoding more immediately apparent, and more easily explorable.
 
-I also made it so you can use it to craft FT8 messages to TX (or
-create audio files).
+I also made it so that an amateur radio enthusiast can use it to craft 
+an FT8 messages to transmit (TX).
 
-I would like to be able to use it to examine received FT8 messages
-from other software in more detail, but the logged data of all FT8
-software (that I've tried) does not save enough information (only the
-text, not the symbols or raw data).
+I'd have also liked to use it to examine received FT8 messages
+in more detail, but no FT8 software appears to log enough information
+for this purpose (i.e. only the decoded text is typically logged, 
+not the symbols or raw data which would allow closer examination).
 
 So mostly it is to show how FT8 works, and a proof of concept, and
 perhaps there are other uses if you need to quickly make an FT8
-message to transmit on SSB. I am interested if people find a use. I'd
+message to transmit on SSB. I'm interested if people find a use. I'd
 also like to add other protocols in future. An audio decoder is
 possible in the future (OpenWebRX / KiwiSDR is already doing this in
-the browser)
+the browser, so it's clearly possible)
 
 In the future maybe it could make something which can be used to make
 a full QSO (TX and RX). I think I would need other interested
-developers before doing that. But with this project I am already 90%
-of the way to a prototype which can do a full FT8 QSO in a web browser
-(i.e. without installing any software, working on all platforms,
-including mobile, and all operating systems. I think this is an
+developers before doing that. But with this project I am already most
+of the way to a prototype which can do a full FT8 QSO in a web browser. That is,
+without installing any software, which works on all platforms including mobile, 
+on all operating systems. I think this is an
 exciting possibility. Just the other 90% of the work is left to do.
 
 ## What things are in the UI
 
 - Lots of stuff now that I haven't documented, so you'll have to explore.
-- Callsign hashes are displayed with Z-Base-32 encoding for easy conversion between 22, 12 and 10 bit hashes. The possible characters are: `ybndrfg8ejkmcpqxot1uwisza345h769`. The middle digit can be any of `ybnd`. Zero `0` is not valid Z-Base-32 and is used to mean 'unknown'. The part of the hash which is included in the field is underlined.
+- Callsign hashes are displayed with Z-Base-32 encoding. This is not used by other software, but I'd encourage it. It allows easy conversion between 22, 12 and 10 bit hashes (all of which are used in FT8). The possible characters are: `ybndrfg8ejkmcpqxot1uwisza345h769`. The middle digit can be any of `ybnd`. Zero `0` is not valid Z-Base-32 and is used to mean 'unknown'. The part of the hash which is included in the field is underlined.
 - Base Frequency (default 500 Hz). FT8 audio output will range from the base frequency to about 50 Hz above it. 1000 Hz is sometimes used as the default base frequency for certain applications, but 500 Hz is the default because it made for more pleasant listening while developing this.
 - Sample Rate: the number of audio samples per second in your generated audio signal. 12000 Hz is the default. 44100 Hz is CD quality. If you set the base frequency to more than about half the sample rate, you'll get fun aliasing effects.
 - "Play at Next 15s Slot" is an awkwardly named button which waits until the next FT8 window begins before playing audio. It's based on your device's clock. Please drop a message or a pull request if you know javascript and have a way of getting a precise time from somewhere on the internet (ala [time.is](https://time.is/)), or if you have an idea for a more consise name for this button.
@@ -98,15 +98,17 @@ Payload/symbol input formats: (for debugging or advanced uses)
 
 ## To do
 - [ ] decode FT8 audio
-- [ ] clean up this documentation
+- [ ] clean up this readme
 - [X] fully support decoding of all ft8 message types
 - [X] fully support encoding of all ft8 message types
+- [ ] create custom ft8 message decoder with full coverage of all possible field values
 - [ ] superfox mode
 - [X] have suggestions for alternative encoding methods when available
 - [ ] save the user's call and grid in a cookie if they like
-- [ ] optimizations
-- [ ] update MSHV to latest + better test coverage for Qt string replacement code
-- [ ] FFT visualization
+- [ ] add benchmarks and optimization
+- [ ] update MSHV to latest + add better test coverage for Qt string replacement code in forked MSHV code
+- [ ] Try adding a WSJT-X module again (e.g. see if latest LFortran will allow converting Fortran to WASM now)
+- [ ] add FFT visualization
 - [ ] lots of other things, but it's largely working and has the basics, so I'm happy to leave it as is for now.
 
 ## Thanks
@@ -126,13 +128,15 @@ Thank you to the authors and contributors of these libraries and data sources—
 - Some entry points if you're looking to contribute code:
    - [ ] The 'explainer', which explains the meaning of QSO text in plain English, could be expanded to cover more cases. It's a lot of if-then-else statements. The code is simple and easy to follow. It's in `ft8_explain.js`. Find QSOs where the explainer doesn't make sense and add a new case.
    - [ ] If you're more into audio visual stuff, you could try to add a spectrogram or waterfall display of the audio. See `views_viz.js`; [wavesurfer.js](https://wavesurfer.xyz/example/spectrogram/?scroll) looks good.
-   - [ ] Or try to work out what kind of .wav files WSJT-X is expecting from file > open.
+   - [ ] If you're into tinkering, try to work out what kind of .wav files WSJT-X is expecting from its file > open. For some reason ft8play's wav files generally don't decode successfully (though they'll decode just fine when played through a microphone or virtual audio cable)
    - [ ] If you're more of a mathematical or puzzle person, you could try porting or creating a solver for LDPC errors, and adding an interface to let ther user add a tab with the corrected message. So far there's a solver which attempts a single step of flipping the most wrong-looking bits.
    - [ ] Have you noticed this is just a to do list in second person?
    - [ ] If you're interested in information design, you could try designing and implementing a visualization of the graycode to binary conversion process in the blocks of bits data view that I should probably label with a better name. The challenge is to add gray code (the values of the symbols), so that when glancing at the diagram it is difficult to confuse the gray code and binary code.
-   - [ ] If you want to force this tool to be something actually useful, you could try adding a way to decode FT8 audio.
+   - [ ] If you're into UI design, you could try improving the flow of the app, e.g. reducing the amount of information shown to the user at first, and allow adding and rearranging information panels.
+   - [ ] If you want to make this tool something useful, you could try adding a way to decode FT8 audio.
    - [ ] If you're into messing with javascript, find a nice way to make the browser back button work within the tool, and make a url format for sharing messages.
-   - [ ] If you're a developer of amateur radio software, learn to use [Git](https://en.wikipedia.org/wiki/Git).
+   - [ ] If you're into web dev, you could reorganize all the code into a proper node-js project, and try to demonstrate how it has some significant advantages to the current vanillia JS (ES6) approach.
+   - [ ] If you're a developer of amateur radio software, learn to use [Git](https://en.wikipedia.org/wiki/Git), which I mention because I'm continually surprised by projects in this community which still use some very ad hoc forms of source control.
 
 - If you find a specific bug, please open an issue or pull request.
   
