@@ -1,8 +1,10 @@
 # FT8 Player by VK3PGO
 
-**[FT8 Player](https://pengowray.github.io/ft8play/)** (`ft8play`) is an online tool to generate and visualize FT8 audio. It runs in a web page.
+**[Pengo Wray's ft8play](https://pengowray.github.io/ft8play/)** is an online tool to generate and visualize FT8 audio. It runs in a web page.
 
-I made this webpage which will pack text into an FT8 message and let you explore the resulting data, signals and audio. It's an experiment in information design, a way to learn about FT8, a tool to test and debug FT8 software, and if you're an amateur radio operator, you can use it to better understand what you're transmitting and receiving. It's also something I can point to and say 'I made this'.
+I made this webpage which will pack text into an FT8 message and let you explore the resulting data, signals and audio. It's an experiment in information design, a way to learn about FT8, a tool to test and debug FT8 software, and if you're an amateur radio operator, you can use it to better understand what you're transmitting and receiving. It's also something I can point to and say 'I made this'. 
+
+[Try it live in your browser right now](https://pengowray.github.io/ft8play/)
 
 Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap and extend the libraries to allow the output to be visualized in FT8 Player. Everything runs locally in a web page. The majority of the source code is plain Javascript. It supports most FT8 message types with a complete breakdown of every field.
 
@@ -155,4 +157,4 @@ Thank you to the authors and contributors of these libraries and data sources—
 - If you fork this project, **do not** use my name or callsigns in the fork's name without permission, but **do** link back to [VK3PGO FT8 Player](https://github.com/pengowray/ft8play).
 
 ## Where can I use VK3PGO's FT8 Player? 
-- [pengowray.github.io/ft8play/](https://pengowray.github.io/ft8play/) — Pengo Wray's ft8play: FT8 Player live in your browser.
+- **[Pengo Wray's ft8play: live in your browser](https://pengowray.github.io/ft8play/)** <pengowray.github.io/ft8play/>
