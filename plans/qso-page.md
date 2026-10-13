@@ -215,6 +215,6 @@ docs/qso/radio/rigctld.js         (later)
 
 ## Open questions
 
-- Does Chrome on your Android phone list the QMX's sound card as an input, and its serial ports in Web Serial? (Needs Chrome 148 or later, and depends on the phone's Android version.)
-- Which USB-serial chip does the (tr)uSDX use? This decides whether it works through Web Serial on Android or needs a WebUSB driver.
-- Does the H4M in HackRF mode work with hackrf.js over WebUSB?
+- Does Chrome on your Android phone list the QMX's sound card as an input, and its serial ports in Web Serial? (Needs Chrome 148 or later, and depends on the phone's Android version.) To check.
+- (tr)uSDX USB-serial chip: CH340 (or CH341). On desktop Chromium, Web Serial works through the OS driver. On Android it will probably need a WebUSB CH340 driver in the page (the CH34x protocol is small: a few vendor control requests for baud rate and line control, then bulk transfers), or the Android app.
+- H4M in HackRF mode over WebUSB: probably works, since its firmware can be updated from a Chrome web page. Not yet tested on Android.
