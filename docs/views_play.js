@@ -1,4 +1,5 @@
 import { Component } from './views.js';
+import { packedToHexStr } from './ft8_extra.js';
 
 export class PlayBtnComponent extends Component {
     constructor(index, container) {
@@ -58,9 +59,9 @@ export class PlayBtnComponent extends Component {
 
     playAudioTimedClicked() {
         const msg = this.getCurrentMessage();
-        if (msg == null) return;
+        if (msg?.audio == null) return;
 
-        msg.queueAudio();
+        msg.audio.queueAudio();
         this.updateButtonState();
     }
 
@@ -76,7 +77,7 @@ export class PlayBtnComponent extends Component {
         function updateCountdown(playview) { // playview = this
             //const minutes = Math.floor(timeRemaining / 60);
             //const seconds = timeRemaining % 60;
-            const seconds = msg?.queueTimeRemaining();
+            const seconds = msg?.audio?.queueTimeRemaining();
             if (seconds == null || seconds < 0) {
                 playview.stopCountdownDisplay();
                 //message.playAudio(); // should be done elsewhere hopefully
@@ -101,8 +102,8 @@ export class PlayBtnComponent extends Component {
         const msg = this.getCurrentMessage(); // may be null
         const nowPlaying = this.viewManager.playingMessages;
         const anyPlaying = nowPlaying.size > 0;
-        const isPlaying =  msg?.isPlaying ?? false;
-        const isQueued =  msg?.queuingStartedAt != null ?? false;
+        const isPlaying = msg?.audio?.isPlaying ?? false;
+        const isQueued = msg?.audio?.queuingStartedAt != null;
         
         //console.log("updateButtonState (isPlaying, nowPlaying, nowPlaying.length):", isPlaying, nowPlaying, nowPlaying.length);
 
@@ -127,7 +128,7 @@ export class PlayBtnComponent extends Component {
     }
 
     resetAudioState(msg) {
-        msg.resetAudioState();
+        msg.audio?.resetAudioState();
         //updateButtonState(false);
         //this.updateButtonState();
     }
@@ -148,23 +149,23 @@ export class PlayBtnComponent extends Component {
 
     downloadAudioClicked() {
         const msg = this.getCurrentMessage();
-        msg.readyAudioAndBuffer();
+        const audio = msg?.audio;
+        if (audio == null) return;
 
-        if (msg == null) return;
+        audio.readyAudioAndBuffer();
+        if (audio.audioSamples == null) return;
 
-        if (msg.audioSamples == null) return;
-
-        const wavData = audioBufferToWav(msg);
+        const wavData = audioBufferToWav(audio);
         const blob = new Blob([wavData], { type: 'audio/wav' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        const baseFreq = msg.getBaseFrequency();
+        const baseFreq = audio.getBaseFrequency();
         let label = '';
-        if (msg.reDecodedResult?.success) label = msg.reDecodedResult.decodedText;
+        if (msg.bestDecodedResult?.success) label = msg.bestDecodedResult.decodedText;
         if (label == null || label == '') label = msg.inputText || packedToHexStr(msg.packedData);
-        const messageText = label.replace(/\s+/g, '_');
+        const messageText = label.replace(/[<>:"\/\\|?*]/g, '').replace(/\s+/g, '_'); // no characters Windows rejects in file names
         a.download = `FT8-${Math.round(baseFreq)}Hz_${messageText}.wav`;
         document.body.appendChild(a);
         a.click();
@@ -178,19 +179,18 @@ export class PlayBtnComponent extends Component {
 
 /**
  * 
- * @param {FT8Message} msg 
+ * @param {import('./ft8_audio.js').MessageAudio} audio
  * @returns 
  */
-function audioBufferToWav(msg) {
-    if (msg == null || msg.audioSamples == null) return null;
+function audioBufferToWav(audio) {
+    if (audio == null || audio.audioSamples == null) return null;
 
     //TODO: don't require AudioBuffer, so can just use readyAudio(); 
-    msg.readyAudioAndBuffer();
-    //msg.readyAudio(); 
+    audio.readyAudioAndBuffer();
 
-    if (msg.audioSamples == null || msg.audioBuffer == null) return null;
+    if (audio.audioSamples == null || audio.audioBuffer == null) return null;
 
-    const buffer = msg.audioBuffer;
+    const buffer = audio.audioBuffer;
 
     //const numChannels = 1; 
     const numChannels = buffer.numberOfChannels;

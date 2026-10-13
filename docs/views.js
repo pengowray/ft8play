@@ -4,6 +4,7 @@ class ViewManager {
         this.components = [];
         this.playingMessages = new Set();
         this.queuedMessages = new Set();
+        this.listenedAudio = new WeakSet(); // MessageAudio objects this manager listens to
 
         window.viewManager = this;
     }
@@ -40,7 +41,7 @@ class ViewManager {
 
     addMessage(message) {
         const index = this.messageManager.addMessage(message);
-        if (message != null) message.viewManager = this;
+        this.listenToAudio(message);
 
         //this.messageManager.switchToMessage(index);
         return index;
@@ -51,6 +52,16 @@ class ViewManager {
         const index = this.addMessage(message)
         this.switchToMessageIndex(index);
         return index;
+    }
+
+    // Pass a message's audio events (queue, play, stop) on to the components.
+    listenToAudio(message) {
+        const audio = message?.audio;
+        if (audio == null || this.listenedAudio.has(audio)) return;
+        this.listenedAudio.add(audio);
+        audio.addEventListener('queue', () => this.onQueue(message));
+        audio.addEventListener('play', () => this.onPlay(message));
+        audio.addEventListener('stop', () => this.onStop(message));
     }
 
     onPlay(message) {
@@ -92,7 +103,7 @@ class ViewManager {
             component.loadMessage(message); // sets .message and calls messageUpdate()
         });
 
-        if (message != null && message.isPlaying) {
+        if (message != null && message.audio?.isPlaying) {
             // pass
         } else {
             this.getComponents(index).forEach((component) => {
@@ -100,7 +111,7 @@ class ViewManager {
             });
         }
 
-        if (oldMessage != null && (message == null || oldMessage != message) && !oldMessage.isPlaying && !oldMessage.queuingStartedAt) {
+        if (oldMessage != null && (message == null || oldMessage != message) && !oldMessage.audio?.isPlaying && !oldMessage.audio?.queuingStartedAt) {
             // todo: check again once old message has stopped playing
             this.deleteMessage(oldMessage);
         }
@@ -123,22 +134,19 @@ class ViewManager {
 
     playAudioIndex(index) {
         const message = this.messageManager.getMessage(index);
-        if (message == null || message.isPlaying) return false;
-        message.viewManager = this;
-        const success = message.playAudio(); // triggers viewManager.onPlay(this);
-
-        // triggered by message.playAudio already
-        //this.views.getComponents(index).forEach((component) => { component.onPlay(); });
+        if (message?.audio == null || message.audio.isPlaying) return false;
+        this.listenToAudio(message);
+        const success = message.audio.playAudio(); // 'play' event calls onPlay()
 
         return success;
     }
     
     stopAllAudio() {
         this.playingMessages.forEach((message) => {
-            message.resetAudioState();
+            message.audio?.resetAudioState();
         });
         this.queuedMessages.forEach((message) => {
-            message.resetAudioState();
+            message.audio?.resetAudioState();
         });
         this.playingMessages.clear();
         this.queuedMessages.clear();

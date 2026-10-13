@@ -2,11 +2,12 @@ import { FT8Message } from './ft8_msg.js';
 import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta  } from "./ft8_extra.js";
 import * as extra from "./ft8_extra.js";
 import * as hashmgr from "./ft8_hashmgr.js";
+import { ENCODERS, encoderForInputType } from "./ft8_engines.js";
 
 /*
 // format: 'ft8/77b', 'ft8/text',  ...
 // generic formats: 'bits', 'text', 'symbols', 'ft8/bits', 'ft8/text', 'ft8/symbols'
-// engine: 'wsjtx', 'ft8_lib', 'mshv', 'ft8play'
+// engine: see ENCODERS in ft8_engines.js
 // engineVersion: example: 'MSHV 245'
 // error: means error creating ft8_msg; NOT error validating msg, but that should also be indicated on the tab
 // todo: processing (flags): 'rpad', 'ucase', 'normalize' (e.g. removed spaces), 'flip bits', 'grits', 'truncate text', 'remove zero padding' ...
@@ -106,29 +107,14 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
         case '237 grits': // symbols (as graycode bits, including sync)
             message.initSymbolsText(extra.grayBitsToSymbols(input));
             return;
-        case 'default/wsjtx':
-            message.initMessage(input, 'wsjtx');
-            return;
-        case 'default/mshv':
-            message.initMessage(input, 'mshv');
-            /*
-            const mshvPackingResult = mshvft8.packMessage(input);
-            if (mshvPackingResult.errorCode !== 0) {
-                throw new Error(`MSHV encoding failed; Code ${mshvPackingResult.errorCode}): ${mshvPackingResult.message}`);
-            } else if (mshvPackingResult.message == null || mshvPackingResult.message == '') {
-                throw new Error(`MSHV encoding failed; No message returned`);
+        default: {
+            const encoder = encoderForInputType(inputType);
+            if (encoder) {
+                message.initMessage(input, encoder.id);
+                return;
             }
-            message.initBits(mshvPackingResult.message);
-            */
-            return;
-        case 'default/ft8lib':
-            message.initMessage(input, 'ft8lib');
-            //const packingResult = ft8lib.messageToPackedData(input);
-            //if (packingResult.errorCode !== 0) throw new Error(`lib_ft8 encoding failed; Code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
-            //message.initPackedData(packingResult.data);
-            return;
-        default:
             throw new Error(`Unhandled input type: ${inputType}`);
+        }
     }
 }
 
@@ -307,12 +293,9 @@ export function normalizeType(input, type) {
         case '237 grits':
             return normalizeBinary(input);
         case 'default':
-        case 'default/wsjtx':
-        case 'default/mshv':
-        case 'default/ft8lib':
-        case 'default/ft8play':
             return extra.normalizeMessage(input);
         default:
+            if (encoderForInputType(type)) return extra.normalizeMessage(input);
             return input;
     }
 }
@@ -339,11 +322,10 @@ export function detectInputTypes(normalizedInput, inputOriginal) {
         inputTypes['free text R'] = 3;
     }
 
-    // ordinary message (todo: checks?)
-    inputTypes['default/wsjtx'] = 10;
-    inputTypes['default/mshv'] = 9; 
-    //inputTypes['default/ft8play'] = 8; // TODO
-    inputTypes['default/ft8lib'] = 7;
+    // ordinary message, one tab per encoder (todo: checks?)
+    for (const encoder of ENCODERS) {
+        inputTypes[`default/${encoder.id}`] = encoder.weight;
+    }
 
     if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
         //TODO: warn if all 0 or 1

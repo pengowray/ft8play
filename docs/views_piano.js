@@ -71,9 +71,9 @@ export class PianoRollComponent extends Component {
     }
 
     onPlay() {
-        if (this.message == null) return;
+        if (this.message?.audio == null) return;
 
-        this.message.readyAudioAndBuffer();
+        this.message.audio.readyAudioAndBuffer();
 
         // Show position line
         //const positionLine = document.getElementById('position-line');
@@ -86,7 +86,7 @@ export class PianoRollComponent extends Component {
             //const currentTime = this.message.audioContext.currentTime - this.message.startTime;
             if (this.message == null) return;
 
-            const timing = this.message?.getTiming();
+            const timing = this.message?.audio?.getTiming();
             const currentTime = timing?.currentTime;
             //console.log('piano timing', timing);
 

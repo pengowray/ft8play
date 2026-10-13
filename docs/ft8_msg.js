@@ -1,14 +1,12 @@
-import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta, symbolsToPackedData  } from "./ft8_extra.js";
+// One FT8 message: its 77 bits, packed bytes and 79 symbols, how it was made
+// (input type, encoder), every encoder's decode of it, and the sync/CRC/parity checks.
+// No DOM or audio here; audio is in ft8_audio.js (message.audio, set by main.js).
+
+import { checkSync, checkCRC, checkParity, symbolsToBitsStrNoCosta } from "./ft8_extra.js";
 import * as extra from "./ft8_extra.js";
-import * as hashmgr from "./ft8_hashmgr.js";
-import FT8LIB from "./ft8_ft8lib.js";
-import MSHVFT8 from "./mshv_ft8_wrap.js";
-import { wsjtxEncode, wsjtxDecode, WSJTX_VERSION } from "./wsjtx/wsjtx_engine.js";
+import { ft8lib, ENCODERS, encoderById, decodeOk } from "./ft8_engines.js";
 
-const ft8lib = new FT8LIB();
-const mshvft8 = new MSHVFT8(() => hashmgr.setMshvft8(mshvft8));
-
-class FT8Message extends EventTarget {
+class FT8Message {
 
     initSymbolsText(symbolsText) {
         this.symbolsText = symbolsText;
@@ -31,42 +29,26 @@ class FT8Message extends EventTarget {
         this.postInit();
     }
 
-    initMessage(text, encoder) {
+    initMessage(text, encoderId) {
         // note: text assumed to be normalized and uppercase
-        if (encoder === 'ft8lib') {
-            //var result = ft8lib.encodeFT8Message(text);            
-            const packingResult = ft8lib.messageToPackedData(text);
-            if (packingResult.success) {
-                this.initPackedData(packingResult.data);
-
-            } else {
-                throw new Error(`Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
-            }
-
-        } else if (encoder === 'wsjtx') {
-            const result = wsjtxEncode(text);
-            if (!result.success) {
-                throw new Error(`WSJT-X ${WSJTX_VERSION} could not pack this message (it would show "*** bad message ***")`);
-            }
-            this.wsjtxEncodeResult = result;
-            this.initBits(result.c77);
-
-        } else if (encoder === 'mshv') {
-            const mshvPackingResult = mshvft8.packMessage(text);
-            if (mshvPackingResult.errorCode == 0 && mshvPackingResult.message) {
-                this.initBits(mshvPackingResult.message);
-            } else {
-                this.encodeError = mshvPackingResult.errorCode;
-            }
+        const encoder = encoderById(encoderId);
+        if (encoder == null) {
+            throw new Error("Unknown encoder or No encoder specified: '" + encoderId + "'");
+        }
+        const result = encoder.encode(text);
+        this.encodedBy = encoder.id;
+        this.encodeInfo = result;
+        if (result.bits != null) {
+            this.initBits(result.bits);
         } else {
-            throw new Error("Unknown encoder or No encoder specified: '" + encoder + "'");
+            this.initPackedData(result.packedData);
         }
     }
 
     postInit() {
         // todo: separate checks and additions
 
-        this.packetType ??= (this.ft8MessageType !== null && ft8MessageType === 'spp') ? 'spp' : 'ft8';
+        this.packetType ??= (this.ft8MessageType === 'spp') ? 'spp' : 'ft8';
 
         if (this.symbolsText == null && this.packedData != null) {
             console.log("empty symbols, generating from packed data (should not happen).")
@@ -101,35 +83,15 @@ class FT8Message extends EventTarget {
 
         this.ft8MessageType ??= extra.getFT8MessageType(this.bits);
 
-        // re-encoding messages
-        
-        // WSJT-X: for text encoded by WSJT-X, use the text genft8 reports as sent (as ft8code shows it).
-        // Otherwise unpack the bits with the shared receive-side state, which knows calls seen so far.
-        if (this.wsjtxEncodeResult) {
-            this.wsjtxDecodedResult = { success: true, decodedText: this.wsjtxEncodeResult.msgsent };
-        } else {
-            try {
-                const r = wsjtxDecode(this.bits, 1);
-                this.wsjtxDecodedResult = r.success
-                    ? { success: true, decodedText: r.msg }
-                    : { success: false, error: true, errorMessage: r.msg || 'unpack77 failed', decodedText: null };
-            } catch (e) {
-                this.wsjtxDecodedResult = { success: false, error: true, errorMessage: e.message, decodedText: null };
-            }
+        // Decode with every encoder. The encoder that made the message reports the
+        // text it says it sent, when it has one (WSJT-X: the text ft8code shows).
+        this.decodeResults = {};
+        for (const encoder of ENCODERS) {
+            const sent = (encoder.id === this.encodedBy) ? this.encodeInfo?.sentText : null;
+            this.decodeResults[encoder.id] = (sent != null) ? decodeOk(sent) : encoder.decode(this);
         }
-
-        this.ft8libDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
-        
-        // translate into ft8libDecodedResult format; TODO: should be other way around
-        const resultMshv = mshvft8.unpackMessage(this.bits);
-        if (resultMshv != null && resultMshv.errorCode == 0) {
-            this.mshvDecodedResult = {success: true, resultText: resultMshv.message, result: resultMshv.message, decodedText: resultMshv.message };
-        } else {
-            this.mshvDecodedResult = {success: false, error: true, result: 'error', errorMessage: resultMshv?.message, errorCode: resultMshv.errorCode, decodedText: null };
-        }
-
-        this.bestDecodedResult = [this.wsjtxDecodedResult, this.mshvDecodedResult, this.ft8libDecodedResult].find(r => r?.success)
-            ?? this.wsjtxDecodedResult;
+        const results = ENCODERS.map(e => this.decodeResults[e.id]);
+        this.bestDecodedResult = results.find(r => r.success) ?? results[0];
     }
 
     bestDecodedResultFromExpected(expectedResults) {
@@ -141,7 +103,7 @@ class FT8Message extends EventTarget {
         if (!expectedResults.error) {
             this.bestDecodedResult = {success: true, resultText: expectedResults.message, result: expectedResults.message, decodedText: expectedResults.message };
         } else {
-            this.bestDecodedResult = {success: false, error: true, result: 'error', result: expectedResults.message, errorMessage: 'Could not unpack in reference', decodedText: expectedResults.decoded };
+            this.bestDecodedResult = {success: false, error: true, result: 'error', resultText: 'error', errorMessage: 'Could not unpack in reference', decodedText: expectedResults.decoded };
             this.decodingError = expectedResults.decoded;
 
         }
@@ -151,7 +113,6 @@ class FT8Message extends EventTarget {
     }
 
     constructor(inputText, expectedResults = null) {
-      super();
 
       this.inputText = inputText;
 
@@ -171,11 +132,12 @@ class FT8Message extends EventTarget {
       // results of encoding
       this.encodeError = null;
 
+      // set by initMessage() when the message was made from text by an encoder
+      this.encodedBy = null; // encoder id, see ft8_engines.js
+      this.encodeInfo = null; // what the encoder returned, e.g. { bits, sentText, uninitialised }
+
       // results of decoding final packed message
-      this.wsjtxEncodeResult = null; // { c77, i3, n3, msgsent, success } when encoded by the WSJT-X port
-      this.wsjtxDecodedResult = null;
-      this.ft8libDecodedResult = null;
-      this.mshvDecodedResult = null;
+      this.decodeResults = null; // { [encoder id]: DecodeResult }
       this.bestDecodedResult = null;
 
       this.tabs = null;
@@ -185,47 +147,8 @@ class FT8Message extends EventTarget {
       this.CRCCheck = null;
       this.ParityCheck = null; // LDPC
 
-      // overrides of defaults
-      this.baseFrequency = null; // 1000
-      this.sampleRate = null; // 12000
-      this.toneSpacing = null; // 6.25
-      this.customToneFrequencies = null;
-      this.symbolBT = null; // 2.0
-      this.symbolPeriod = null; // 0.160
-      //this.numOfSymbols = null; // 79 (todo)
-
-      this.audioSamples = null;
-      this.dphiSamples = null;
-      this.levelsSamples = null;
-
-      // for playing
-      this.isPlaying = false; // == (audioSource != null)
-      this.playStartTime = null;
-
-      // all should be null when not queuing
-      this.queuingStartedAt = null; // if playing is queued for next 15s
-      this.queuingUntil == null; // when to start playing
-      this.queueInterval = null; // check if ready to play
-
-      this.audioContext = null;
-      this.audioBuffer = null;
-      this.channelData = null;
-      this.audioSource = null; // only not null while playing
-
-      // ViewManager for reporting audio stop/start/queued/etc
-      this.viewManager = null;
-
-      
-      //this.hashes = hashmgr.hashes;
-
-      // setup Event Listeners
-      //this.dispatchEvent(new Event('queue'));
-      //this.dispatchEvent(new Event('play'));
-      //this.dispatchEvent(new Event('pause'));
-      //this.audioSource.onended = () => this.dispatchEvent(new Event('stop'));
-
-      //usage example:
-      //msg.addEventListener('play', () => console.log('Audio started playing'));
+      // MessageAudio (ft8_audio.js), when the page wants audio for this message
+      this.audio = null;
     }
     
     getSyncCheck() {
@@ -248,315 +171,13 @@ class FT8Message extends EventTarget {
         return repaired;
     }
 
-    getTiming() {
-        const isPlaying = this.isPlaying;
-        const audioCurrentTime = (this.audioContext) ? this.audioContext.currentTime : null;
-        //const startTime = this.playStartTime;
-        const startTime = this.playStartTime ?? 0;
-        const currentTime =  audioCurrentTime - startTime;
-        //const currentTime =  audioCurrentTime;
-        const duration = this.audioBuffer ? this.audioBuffer.duration : null;
-
-        let remainingTime = duration - currentTime;
-        if (remainingTime < 0) remainingTime = 0;
-
-        let progress = currentTime / duration * 100;
-        if (progress < 0) progress = 0;
-        if (progress > 100) progress = 100;
-
-        //TODO: use metadata to get audio start/end/symbol durations
-        let symbolDuration = 0.160; // default
-        if (this.audioBuffer != null && this.audioBuffer.duration) symbolDuration = this.audioBuffer.duration / 79; // 79 symbols in FT8
-        const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
-        //const currentSymbolIndex = Math.floor(audioCurrentTime / symbolDuration);
-        
-        return { isPlaying, audioCurrentTime, startTime,  currentTime, duration, remainingTime, progress, currentSymbolIndex };
-    }
-
-    setAudioOptions(sampleRate, baseFrequency, customToneFrequencies = null) {
-        this.sampleRate = sampleRate;
-        this.baseFrequency = baseFrequency;
-        this.customToneFrequencies = customToneFrequencies;
-    }
-
-    
-    clearAudioData() {
-        this.audioSamples = null;
-        this.dphiSamples = null;
-        this.levelsSamples = null;
-        //this.metadata = null;
-        this.audioBuffer = null;
-        this.channelData = null;
-        //this.audioContext = null; // reuse? stop audio first?
-        this.audioSource = null;
-    }
-
     clearAllCached() {
         this.SyncCheck = null;
         this.CRCCheck = null;
         this.ParityCheck = null;
-        this.clearAudioData();
+        this.audio?.clearAudioData();
         //TODO: clear everything generated by encode() except maybe symbols and packedData
     }
-
-    readyAudio() {
-        if (this.audioSamples == null) {
-            this.generateAudio();
-        }
-    }
-
-    readyAudioAndBuffer() {
-        this.readyAudio();
-
-        if (this.audioSamples == null || this.audioSamples.length == 0) {
-            // failed to generate audio
-            return;
-        }
-
-        //aka setupAudioPlayback()
-
-        const sampleRate = this.getSampleRate(); // message.getOptions().sampleRate;
-        //const metadata = message.metadata;
-
-        //this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-        this.audioContext = this.audioContext || new window.AudioContext({ sampleRate: sampleRate });
-        this.audioBuffer = this.audioBuffer || this.audioContext.createBuffer(1, this.audioSamples.length, sampleRate);
-        if (this.channelData == null) {
-            this.channelData = this.audioBuffer.getChannelData(0);
-            this.channelData.set(this.audioSamples);
-        }
-    }
-
-    queueTimeRemaining() {
-        if (!this.queuingStartedAt || !this.queuingUntil) return null;
-        const seconds = (this.queuingUntil - new Date().getTime()) / 1000;
-        return seconds < 0 ? 0 : seconds;
-    }
-
-    queueAudio() {
-        if (this.isPlaying) return false; // already playing
-        if (this.queuingStartedAt) return false; // already queued
-
-        this.readyAudioAndBuffer();
-
-        if (!this.audioContext) {
-            console.error("No audio context");
-            return false;
-        }
-
-        this.queuingStartedAt = Date.now();
-        const now = new Date().getSeconds();
-        const latency = (this.audioContext?.outputLatency ?? 0);
-        const secondsUntilNext15 = 15 - ((now + latency) % 15);
-        //const displaySecondsUntilNext15 = 15 - (now % 15);
-        let nextCycleTime = new Date().getTime() + secondsUntilNext15 * 1000;
-        this.queuingUntil = nextCycleTime;
-
-        this.queueInterval = setInterval(() => {
-            const currentTime = new Date().getTime();
-            if (!this.queueInterval || !this.queuingUntil || this.isPlaying) {
-                clearInterval(this.queueInterval);
-                return;
-            }
-            if (currentTime >= this.queuingUntil) {
-                clearInterval(this.queueInterval);
-                this.playAudio();
-            }
-        }, 90); // Check every 90ms
-    
-        if (this.viewManager) this.viewManager.onQueue(this);
-        this.dispatchEvent(new Event('queue'));
-    }
-
-    playAudio() {
-        //if (this.audioSource) { return; /* already playing */ }
-        if (this.isPlaying) return false;
-
-        if (this.queuingStartedAt) {
-            this.queuingStartedAt = null;
-            this.queuingUntil = null;
-        }
-
-        this.readyAudioAndBuffer();
-        if (!this.audioBuffer) return false;
-        
-        const msg = this;
-        msg.isPlaying = true;
-
-        this.audioContext.resume().then(() => {
-            console.log("Audio context resumed");
-            msg.audioSource = msg.audioContext.createBufferSource();
-            msg.audioSource.buffer = msg.audioBuffer;
-            msg.audioSource.connect(msg.audioContext.destination);
-            msg.audioSource.start();
-            
-            msg.audioSource.onended = () => this.resetAudioState();
-            if (this.viewManager) this.viewManager.onPlay(this);
-
-            msg.playStartTime = msg.audioContext.currentTime;
-        });
-        //if (this.viewManager) this.viewManager.onPlay(this);
-        return true;
-    }
-    
-    resetAudioState() {
-        console.log("resetAudioState (stopping)");
-        this.isPlaying = false;
-        this.playStartTime = null;
-
-        if (this.audioSource) this.audioSource.onended = null;
-        if (this.audioSource) this.audioSource.stop();
-        //this.clearAudioAndBuffer();
-        this.queuingStartedAt = null;
-        this.queuingUntil = null;
-
-        if (this.viewManager) this.viewManager.onStop(this);
-        this.dispatchEvent(new Event('stop'));
-    }
-
-    getSampleRate() {
-        return this.sampleRate ?? 12000;
-    }
-    getBaseFrequency() {
-        return this.baseFrequency ?? 1000;
-    }
-    getOptions() {
-        //TODO: cache this
-        return {
-            baseFrequency: this.getBaseFrequency(),
-            sampleRate: this.getSampleRate(),
-            toneSpacing: this.toneSpacing ?? 6.25,
-            customToneFrequencies: this.customToneFrequencies ?? null,
-            symbolBT: this.symbolBT ?? 2.0,
-            symbolPeriod: this.symbolPeriod ?? 0.160
-        };
-    }
-
-    /*
-    updates this.audioSamples, this.dphiSamples, this.metadata
-    */
-    generateAudio() {
-        const options = this.getOptions();
-        if (this.symbolsText == null) return;
-    
-        const numSymbols = this.symbolsText.length;
-        
-        // Allocate memory for symbols string
-        //const symbolsPtr = Module.stringToUTF8(this.symbolsText);
-        const symbolsPtr = ft8lib.module._malloc(numSymbols + 1); // +1 for null terminator
-        for (let i = 0; i < numSymbols; i++) {
-            ft8lib.module.HEAP8[symbolsPtr + i] = this.symbolsText.charCodeAt(i);
-        }
-        ft8lib.module.HEAP8[symbolsPtr + numSymbols] = 0; // Null terminator
-
-        // Calculate number of samples
-        let numSamples = ft8lib.module._calculate_num_samples(numSymbols, options.symbolPeriod, options.sampleRate);
-    
-        // Allocate memory for audio and dphi
-        const audioPtr = ft8lib.module._malloc(numSamples * 4);
-        const dphiPtr = ft8lib.module._malloc(numSamples * 4);
-        const levelsPtr = ft8lib.module._malloc(numSamples * 4);
-
-        // Allocate memory for metadata
-        const metadataLengthPtr = ft8lib.module._malloc(4);
-        const metadataJsonPtrPtr = ft8lib.module._malloc(4);
-        const FT8_TONE_COUNT = 8;
-    
-        let result;
-        const n_start_delay = 0;  // Set to 0 for now
-        const n_end_extension = 0;  // Set to 0 for now
-    
-        if (options.customToneFrequencies != null) {
-            // Use custom tone frequencies
-            const toneOffsetsPtr = ft8lib.module._malloc(FT8_TONE_COUNT * 4);
-            const toneOffsets = new Float32Array(ft8lib.module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
-            for (let i = 0; i < FT8_TONE_COUNT; i++) {
-                toneOffsets[i] = options.customToneFrequencies[i];
-            }
-    
-            result = ft8lib.module._synth_gfsk_custom(
-                symbolsPtr, options.baseFrequency, toneOffsetsPtr,
-                options.symbolBT, options.symbolPeriod, options.sampleRate,
-                n_start_delay, n_end_extension,
-                audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
-            );
-    
-            ft8lib.module._free(toneOffsetsPtr);
-        } else {
-            // Use default FT8 frequencies
-            result = ft8lib.module._synth_gfsk_custom(
-                symbolsPtr, options.baseFrequency, 0, // Pass 0 for custom_tones when using default
-                options.symbolBT, options.symbolPeriod, options.sampleRate,
-                n_start_delay, n_end_extension,
-                audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
-            );
-        }
-    
-        const audio = new Float32Array(ft8lib.module.HEAPF32.buffer, audioPtr, numSamples);
-        const dphi = new Float32Array(ft8lib.module.HEAPF32.buffer, dphiPtr, numSamples);
-        const levels = new Float32Array(ft8lib.module.HEAPF32.buffer, levelsPtr, numSamples);
-        this.audioSamples = Array.from(audio);
-    
-        const dphiArray = Array.from(dphi);
-        this.dphiSamples = scaleToRange(dphiArray, 190, 10);
-
-        const levelsArray = Array.from(levels);
-        this.levelsSamples = scaleToRange(levelsArray, 195, 5);
-
-        const metadataLength = ft8lib.module.HEAP32[metadataLengthPtr / 4];
-        const metadataJsonPtr = ft8lib.module.HEAP32[metadataJsonPtrPtr / 4];
-        const metadataStr = ft8lib.module.UTF8ToString(metadataJsonPtr, metadataLength);
-    
-        try {
-            this.metadata = JSON.parse(metadataStr);
-        } catch {
-            error = "(internal error) Failed to parse metadata: '" + metadataStr + "'";
-            console.error(error);
-        } finally {
-            // Free allocated memory
-            ft8lib.module._free(symbolsPtr);
-            ft8lib.module._free(audioPtr);
-            ft8lib.module._free(dphiPtr);
-            ft8lib.module._free(levelsPtr);
-            ft8lib.module._free(metadataLengthPtr);
-            ft8lib.module._free(metadataJsonPtrPtr);
-            ft8lib.module._free(metadataJsonPtr);
-        }
-    }
 }
 
-
-/**
- * @param {Array} numbers - array of numbers to scale
- * @param {number} newMin - new minimum value of the scaled range
- * @param {number} newMax - new maximum value of the scaled range
- * @returns {Array} - The array of numbers scaled to the new range
- */
-function scaleToRange(numbers, newMin, newMax) {
-    const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
-    //console.log("min/max:", originalMin, originalMax);
-    const scale = (newMax - newMin) / (originalMax - originalMin);
-    
-    return numbers.map(num => (num - originalMin) * scale + newMin);
-}
-
-function findMinAndMax(numbers) {
-    let min = Infinity;
-    let max = -Infinity;
-    
-    for (const num of numbers) {
-        if (num < min) min = num;
-        if (num > max) max = num;
-    }
-    
-    return { min, max };
-}
-
-
-export { 
-    // needed
-    FT8Message,
-
-    // meh (probably internal)
-    scaleToRange, findMinAndMax
-};
+export { FT8Message };

@@ -81,7 +81,7 @@ export class TribbleComponent extends Component {
                 }
             } else if (rowType === 'symbols') {
                 //if (this.message) this.message.readyAudioAndBuffer();
-                const audioOptions = this.message?.getOptions();
+                const audioOptions = this.message?.audio?.getOptions();
                 const baseFreq = audioOptions?.baseFrequency ?? 0;
                 const toneSpacing = audioOptions?.toneSpacing ?? 6.25;                
                 //TODO: if bad symbol ('-' or ' ') then no frequency
@@ -281,8 +281,8 @@ export class TribbleComponent extends Component {
     }
 
     frameUpdate() {
-        if (this.message && this.message.isPlaying) {
-            const timing = this.message.getTiming();
+        if (this.message?.audio?.isPlaying) {
+            const timing = this.message.audio.getTiming();
             if (timing && timing.currentSymbolIndex !== this.currentSymbol) {
                 this.currentSymbol = timing.currentSymbolIndex;
                 this.highlightCurrentSymbol();

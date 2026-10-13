@@ -1,4 +1,5 @@
-import { FT8Message } from './ft8_msg.js';
+import { MessageAudio } from './ft8_audio.js';
+import { inputTypeInfo } from './ft8_engines.js';
 import { inputToTabs } from './ft8_tabs.js';
 import { ViewManager } from './views.js';
 import { VizComponent } from './views_viz.js';
@@ -392,16 +393,14 @@ function initializeUI() {
         }
         //console.log(`freq: ${freqData.baseHz} (${freqData.customTones.join(' ')})`);
         const sampleRate = parseInt(sampleRateSelect.value);
-        message.setAudioOptions(sampleRate, freqData.baseHz, freqData.customTones);
-
-        //const { audio, dphi, metadata } = generateAudioFromSymbols(symbolsArray, baseFrequency, sampleRate);
-        //const audioResult = generateAudioFromSymbols(symbolsArray, options);
-        message.generateAudio();
+        message.audio ??= new MessageAudio(message);
+        message.audio.setAudioOptions(sampleRate, freqData.baseHz, freqData.customTones);
+        message.audio.generateAudio();
 
         const index = viewManager.addMessage(message);
         viewManager.switchToMessageIndex(index);
 
-        if (message.audioSamples.length > 0) {
+        if (message.audio.audioSamples.length > 0) {
             //setupAudioPlayback(message);
         } else {
             throw new Error("Error generating audio data generated");
@@ -424,12 +423,7 @@ function initializeUI() {
             if (msg.inputType != null && msg.inputType.length > 0) {
                 // todo: inputTypeDescriptions[msg.type] + inputType
                 //const typeName = msg.type;
-                let typeInfo = msg.inputType;
-                if (typeInfo != null && typeInfo.startsWith('default/')) {
-                    typeInfo = typeInfo.slice(8);
-                    if (typeInfo == 'ft8lib') typeInfo = 'ft8_lib';
-                    if (typeInfo == 'wsjtx') typeInfo = 'WSJT-X';
-                }
+                let typeInfo = inputTypeInfo(msg.inputType).label;
 
                 if (msg.packetType == 'spp') {
                     tabButton.innerHTML = `Space Packet Protocol 🛰<br>${typeInfo}`;

@@ -52,7 +52,7 @@ export class VizComponent extends Component {
     messageUpdate() {
         // Update any cached data that depends on the message
 
-        if (this.message != null && this.message.isplaying) {
+        if (this.message != null && this.message.audio?.isPlaying) {
             this.onPlay();
         } else {
             this.onStop();
@@ -75,9 +75,11 @@ export class VizComponent extends Component {
             return;
         };
 
-        this.message.readyAudioAndBuffer(); // needed for viz
+        const audio = this.message.audio;
+        if (audio == null) return;
+        audio.readyAudioAndBuffer(); // needed for viz
 
-        const timing = this.message.getTiming();
+        const timing = audio.getTiming();
         //if (timing == null) return; // todo: or clear?
 
         // todo: keep track of if need to update when not playing
@@ -107,15 +109,15 @@ export class VizComponent extends Component {
         const message = this.message; // messageManager.getCurrentMessage();
         if (message == null) return;
 
-        const sampleRate = message.sampleRate;
+        const sampleRate = audio.sampleRate;
 
         ctx.beginPath();
         ctx.moveTo(0, middle);
 
         const zoomLevel = mode['zoom'];
 
-        const data = showDphi ? message.dphiSamples : message.audioSamples;
-        const levelsData = showDphi ? message.levelsSamples : null;
+        const data = showDphi ? audio.dphiSamples : audio.audioSamples;
+        const levelsData = showDphi ? audio.levelsSamples : null;
 
         if (!data || data.length === 0) {
             console.error(`No ${showDphi ? 'dphi samples' : 'audio samples'} to draw`);
@@ -197,7 +199,7 @@ export class VizComponent extends Component {
             doDraw(data, false, 'steelblue');
         }
 
-        if (this.message.isPlaying) {
+        if (audio.isPlaying) {
             // Draw playback position line
             const playbackX = ((currentTime - startTime) / visibleDuration) * width;
             ctx.beginPath();
@@ -219,9 +221,12 @@ export class VizComponent extends Component {
     }
 
     onPlay() {
-        if (this.message == null) onStop();
+        if (this.message?.audio == null) {
+            this.onStop();
+            return;
+        }
 
-        this.message.readyAudioAndBuffer();
+        this.message.audio.readyAudioAndBuffer();
         if (this.interval != null) return;
 
         this.interval = setInterval(() => {

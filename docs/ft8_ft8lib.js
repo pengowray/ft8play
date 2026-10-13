@@ -21,7 +21,7 @@ class FT8Lib {
     this.encodeFT8Message = this.module.cwrap('encodeFT8Message', 'number', ['string']);
     this.freeFT8EncodeResult = this.module.cwrap('freeFT8EncodeResult', 'void', ['number']);
     this.packedToSymbols = this.module.cwrap('packedToSymbols', 'number', ['array']);
-    this.symbolsToAudio = this.module.cwrap('symbolsToAudio', 'number', ['array', 'number', 'number']);
+    this.symbolsToAudioRaw = this.module.cwrap('symbolsToAudio', 'number', ['array', 'number', 'number']);
     this.decodeFT8PackedData = this.module.cwrap('decodeFT8PackedData', 'number', ['number', 'number']);
     this.freeFT8DecodeResult = this.module.cwrap('freeFT8DecodeResult', 'void', ['number']);
   }
@@ -78,7 +78,7 @@ class FT8Lib {
   symbolsToAudio(symbols, baseFreq, sampleRate) {
     if (!this.module) throw new Error("Module not initialized");
     const symbolArray = symbolsToArray(symbols);
-    const resultPtr = this.symbolsToAudio(symbolArray, baseFreq, sampleRate);
+    const resultPtr = this.symbolsToAudioRaw(symbolArray, baseFreq, sampleRate);
     const result = {
       symbols: new Uint8Array(this.module.HEAPU8.buffer, this.module.getValue(resultPtr + 8, '*'), FT8_NN),
       audio: new Float32Array(this.module.HEAPF32.buffer, this.module.getValue(resultPtr + 16, '*'), this.module.getValue(resultPtr + 20, 'i32')),

@@ -1,9 +1,13 @@
 import { Component } from './views.js';
-import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName, escapeHTML }  from './ft8_extra.js';
+import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName, escapeHTML }  from './ft8_extra.js';
 import * as extra from "./ft8_extra.js";
 import { explainFT8Message } from './ft8_explain.js';
 import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
 import { WSJTX_VERSION } from './wsjtx/wsjtx_engine.js';
+import { ENCODERS, inputTypeInfo } from './ft8_engines.js';
+
+// Decoded text from the other encoders is compared with this one's.
+const REFERENCE_ENCODER = 'wsjtx';
 
 const REFERENCE = 'expected';
 const DECODED = 'found';
@@ -39,16 +43,13 @@ export class OutputComponent extends Component {
         return {
             inputText: message.inputText,
             inputType: message.inputType,
-            inputTypeDescription: inputTypeDescriptions[message.inputType],
+            inputTypeLabel: inputTypeInfo(message.inputType).label,
+            inputTypeDescription: inputTypeInfo(message.inputType).description,
             ft8MessageType: message.ft8MessageType,
             messageTypeInfo: extra.getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
             decodedText: message.bestDecodedResult?.success ? message.bestDecodedResult?.decodedText : '',
-            decodedText_ft8lib: message.ft8libDecodedResult?.decodedText,
-            decodedText_mshv: message.mshvDecodedResult?.success ? message.mshvDecodedResult?.decodedText : '',
-            ft8libDecodedResult: message.ft8libDecodedResult,
-            mshvDecodedResult: message.mshvDecodedResult,
             symbols: message.symbolsText,
             packed: extra.packedToHexStrSp(message.packedData),
             veryPacked: extra.packedToHexStr(message.packedData),
@@ -255,7 +256,7 @@ export class OutputComponent extends Component {
             <h2>${data.messageTypeInfo} (${data.ft8MessageType})</h2>
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
-                ${this.renderRowDataField( { label: 'Input type', value: data.inputType, subtype: data.inputTypeDescription, isField: false })}
+                ${this.renderRowDataField( { label: 'Input type', value: data.inputTypeLabel, subtype: data.inputTypeDescription, isField: false })}
                 ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType, isField: false }) : ''}
 
                 ${this.renderSubheading('Message Fields')}
@@ -295,12 +296,11 @@ export class OutputComponent extends Component {
     // One row per decoder. WSJT-X is the reference; other decoders are flagged when they disagree with it.
     renderDecodedTextRows() {
         const msg = this.message;
-        const decoders = [
-            { name: 'WSJT-X', result: msg.wsjtxDecodedResult },
-            { name: 'mshv', result: msg.mshvDecodedResult },
-            { name: 'ft8_lib', result: msg.ft8libDecodedResult },
-        ].filter(d => d.result != null);
-        const reference = msg.wsjtxDecodedResult?.success ? msg.wsjtxDecodedResult.decodedText.trim() : null;
+        const decoders = ENCODERS
+            .map(encoder => ({ encoder, name: encoder.name, result: msg.decodeResults?.[encoder.id] }))
+            .filter(d => d.result != null);
+        const referenceResult = msg.decodeResults?.[REFERENCE_ENCODER];
+        const reference = referenceResult?.success ? referenceResult.decodedText.trim() : null;
         const anyHash = decoders.some(d => d.result.success && d.result.decodedText?.includes('<...>'));
 
         return decoders.map((d, i) => {
@@ -310,7 +310,7 @@ export class OutputComponent extends Component {
             }
             const text = r.decodedText.trim();
             let subtype = null;
-            if (d.name !== 'WSJT-X' && reference != null && text !== reference) {
+            if (d.encoder.id !== REFERENCE_ENCODER && reference != null && text !== reference) {
                 if (text.toUpperCase() === reference.toUpperCase()) {
                     subtype = 'Differs from WSJT-X in letter case only';
                 } else if (normalizeMessageAndHashes(text) === normalizeMessageAndHashes(reference)) {
@@ -320,7 +320,7 @@ export class OutputComponent extends Component {
                 }
             }
             let desc = (i === decoders.length - 1 && anyHash) ? '<...> represents a hashed callsign.' : null;
-            const uninitialised = d.name === 'WSJT-X' ? msg.wsjtxEncodeResult?.uninitialised : null;
+            const uninitialised = (d.encoder.id === 'wsjtx' && msg.encodedBy === 'wsjtx') ? msg.encodeInfo?.uninitialised : null;
             if (uninitialised?.length) {
                 subtype = 'Real WSJT-X may send different bits';
                 desc = `To pack this message, WSJT-X ${WSJTX_VERSION} reads variables that its code never sets, so the result depends on leftover memory. FT8 Player uses 0 or blanks for them.\nDetails: ${uninitialised.join('; ').replace(/JS assumes/g, 'FT8 Player uses')}`;
