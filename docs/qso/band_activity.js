@@ -33,7 +33,7 @@ export class BandActivity {
      */
     addSlot({ slot, start, label, receivedSeconds, decodes }) {
         const time = start != null ? utcTime(start) : null;
-        const count = `${decodes.length} decode${decodes.length === 1 ? '' : 's'}`;
+        const count = `${decodes.length} message${decodes.length === 1 ? '' : 's'}`;
         let title = start != null ? `${time} UTC · ${count}` : `${label} · ${count}`;
         // A slot heard only in part (receiving started or stopped during it) can't decode fully.
         if (start != null && receivedSeconds != null && receivedSeconds < 13) {

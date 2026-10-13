@@ -74,6 +74,7 @@ h2 { font-size: 15px; margin: 0 0 6px; }
 
 .rx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rx-status { margin-top: 8px; }
+.source-label { font-size: 13px; color: var(--muted); }
 .source { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .source label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; }
 .source label + label { border-left: 1px solid var(--line); }

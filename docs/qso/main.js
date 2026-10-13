@@ -61,9 +61,9 @@ pipeline.addEventListener('error', (e) => showError(`Decoder error: ${e.detail.m
 
 // ---- Source selection ----
 const help = {
-    soundcard: 'Receives from a sound card input, such as a radio\'s USB audio. Set the radio to USB (upper sideband) on an FT8 frequency, for example 14.074 MHz.',
-    test: 'Plays simulated FT8 stations in noise, as if from a radio, so you can try the page without one. Nothing is transmitted.',
-    file: 'Decodes a recording of one 15 s slot that starts at the slot boundary, such as a WAV file saved by WSJT-X.',
+    soundcard: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, for example 14.074 MHz. The browser will ask for microphone permission.',
+    test: 'Simulated FT8 signals mixed with noise, for trying the page without a radio.',
+    file: 'Decodes the first 15 s of a recording. The recording must start at the beginning of a slot (:00, :15, :30 or :45 past the minute), such as a WAV file saved by WSJT-X.',
 };
 function selectedSource() {
     return document.querySelector('input[name="source"]:checked').value;
@@ -139,7 +139,7 @@ async function startSource() {
         sourceKind = null;
         showError(kind === 'soundcard' && err.name === 'NotAllowedError'
             ? 'Microphone permission was refused. Allow it in the browser\'s site settings, then try again.'
-            : `Could not start: ${err.message}`);
+            : `Could not start receiving: ${err.message}`);
     }
     updateControls();
 }
@@ -179,7 +179,7 @@ function updateControls() {
     if (lastError) setState(lastError, 'error');
     else if (source && sourceKind === 'test') setState('Receiving test signals', 'running');
     else if (source) setState(`Receiving from ${source.deviceLabel || 'sound card'}`, 'running');
-    else if (kind !== 'file') setState('Stopped');
+    else if (kind !== 'file') setState('Not receiving');
 }
 
 // ---- Clock display, about 10 times a second ----
@@ -191,11 +191,11 @@ function tick() {
     const into = clock.secondsIntoSlot(now);
     document.querySelector('.slot-fill').style.width = `${(into / clock.mode.slotSeconds * 100).toFixed(1)}%`;
     document.querySelector('.slot-bar').setAttribute('aria-valuenow', into.toFixed(0));
-    $('slot-label').textContent = `${clock.isEvenSlot(clock.slotIndex(now)) ? 'Even' : 'Odd'} slot · ${into.toFixed(1)} s`;
+    $('slot-label').textContent = `${clock.isEvenSlot(clock.slotIndex(now)) ? 'Even' : 'Odd'} slot · ${into.toFixed(1)} of ${clock.mode.slotSeconds} s`;
     const offset = clock.offsetMs / 1000;
     $('clock-offset').textContent = clock.offsetSource === OFFSET_SOURCE.NONE
-        ? 'Clock not corrected'
-        : `Clock corrected ${offset >= 0 ? '+' : ''}${offset.toFixed(2)} s (${clock.offsetSource === OFFSET_SOURCE.DECODES ? 'from decodes' : 'manual'})`;
+        ? 'Clock: computer time'
+        : `Clock: computer time ${offset >= 0 ? '+' : '−'}${Math.abs(offset).toFixed(2)} s (${clock.offsetSource === OFFSET_SOURCE.DECODES ? 'from decoded messages' : 'set manually'})`;
     if (source) {
         const level = Math.max(-60, Math.min(0, source.level));
         $('level').value = level;
@@ -205,4 +205,4 @@ function tick() {
 setInterval(tick, 100);
 tick();
 updateControls();
-pipeline.start().catch((err) => showError(`Decoder failed to load: ${err.message}`));
+pipeline.start().catch((err) => showError(`Decoder failed to load: ${err.message}. Reload the page to try again.`));

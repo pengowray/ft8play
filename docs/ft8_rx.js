@@ -21,6 +21,10 @@ const dbToPower = (v) => Math.pow(10, (v / 2 - 120) / 10);
 export async function loadFt8libModule() {
     const base = new URL('./ft8lib/', import.meta.url);
     return createFt8libModule({
+        // ft8_lib prints its DSP settings (block size, FFT size) to stderr; keep other messages.
+        printErr: (text) => {
+            if (!/^(Block size|Subblock size|N_FFT|Waterfall size) =/.test(text)) console.error(text);
+        },
         locateFile: (path) => {
             const url = new URL(path, base);
             return url.protocol === 'file:' ? decodeURIComponent(url.pathname) : url.href;
