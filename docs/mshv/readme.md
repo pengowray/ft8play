@@ -6,6 +6,10 @@ MSHV is multiplatform software designed for use by amateur radio afficinados. It
 
 MSHV is written in C++ and uses the Qt framework. This port is a subset of the original software, focusing on the FT8 mode. It is compiled to web assembly using emscripten. MSHV's FT8 pack/unpack functions are exposed to javascript, so that they can be used in the [FT8 Player](https://pengowray.github.io/).
 
+## Version
+
+This build is based on MSHV 2.76.7 (source code: [MSHV_2767_Full_Source_Code.zip](https://sourceforge.net/projects/mshv/files/MSHV_2767_Full_Source_Code.zip)). It was compiled with Emscripten 6.0.12 on 13 October 2026, from the _wasm_ branch of the fork at commit d873932.
+
 ## Source Code and License
 
 https://github.com/pengowray/MSHV/

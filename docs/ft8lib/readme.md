@@ -4,6 +4,10 @@ This is a web assembly port of [ft8_lib by Karlis Goba (YL3JG)](https://github.c
 
 ft8_lib is written in C and is designed to be used in amateur radio software. It is a lightweight FT8/FT4 decoder and encoder, initially intended for experimental use on microcontrollers.
 
+## Version
+
+This build is based on ft8_lib commit [9fec6ca](https://github.com/kgoba/ft8_lib/commit/9fec6ca39886edbf96f4f5e71edc76da5074e871) from 23 August 2025 ("non-standard callsigns; special CQ; field type annotation"), the latest upstream commit when the build was made. It was compiled with Emscripten 6.0.12 on 13 October 2026, from the _wasm_ branch of the fork at commit a02161f.
+
 ## Source Code and License
 
 https://github.com/pengowray/ft8_lib
