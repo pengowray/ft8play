@@ -61,9 +61,8 @@ export class OutputComponent extends Component {
             crcCheck: message.getCRCCheck(),
             parityCheck: message.getParityCheck(),
             checks: this.prepareChecks(),
-            explanation: this.message.bestDecodedResult?.success ? 
-                explainFT8Message(this.message.bestDecodedResult.decodedText, this.message.ft8MessageType) : 
-                null,
+            explanation: message.packetType === 'spp' ? null :
+                explainFT8Message(message.bits, message.bestDecodedResult?.success ? message.bestDecodedResult.decodedText : null),
             tests: this.prepareTests(),
             repaired: message.getParityRepairedCodeword(),
             testType,
