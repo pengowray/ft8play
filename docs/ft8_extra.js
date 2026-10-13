@@ -1015,18 +1015,14 @@ export function bitsToCall(bits) {
     //return `${details.callsign} (${details.type})`;
 }
 
-export function nchar(char, table) {
-    return table.indexOf(char);
-}
-
 export function hashCallsign(callsign) {
     const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
 
     let n58 = BigInt(0);
     const maxLength = Math.min(callsign.length, 11);
 
-    for (let i = 0; i < maxLength; i++) {
-        const j = nchar(callsign[i], FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
+    for (let i = 0; i < maxLength; i++) {        
+        const j = FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH.indexOf(callsign[i]);
         if (j < 0) {
             //console.error("Invalid character in callsign for hashing: " + callsign[i]);
             return null; // hash error (wrong character set)
