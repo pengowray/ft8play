@@ -6,7 +6,7 @@ import * as hashmgr from "./ft8_hashmgr.js";
 /*
 // format: 'ft8/77b', 'ft8/text',  ...
 // generic formats: 'bits', 'text', 'symbols', 'ft8/bits', 'ft8/text', 'ft8/symbols'
-// engine: 'ft8_lib', 'mshv', 'ft8play'
+// engine: 'wsjtx', 'ft8_lib', 'mshv', 'ft8play'
 // engineVersion: example: 'MSHV 245'
 // error: means error creating ft8_msg; NOT error validating msg, but that should also be indicated on the tab
 // todo: processing (flags): 'rpad', 'ucase', 'normalize' (e.g. removed spaces), 'flip bits', 'grits', 'truncate text', 'remove zero padding' ...
@@ -105,6 +105,9 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
             return;
         case '237 grits': // symbols (as graycode bits, including sync)
             message.initSymbolsText(extra.grayBitsToSymbols(input));
+            return;
+        case 'default/wsjtx':
+            message.initMessage(input, 'wsjtx');
             return;
         case 'default/mshv':
             message.initMessage(input, 'mshv');
@@ -304,6 +307,7 @@ export function normalizeType(input, type) {
         case '237 grits':
             return normalizeBinary(input);
         case 'default':
+        case 'default/wsjtx':
         case 'default/mshv':
         case 'default/ft8lib':
         case 'default/ft8play':
@@ -336,6 +340,7 @@ export function detectInputTypes(normalizedInput, inputOriginal) {
     }
 
     // ordinary message (todo: checks?)
+    inputTypes['default/wsjtx'] = 10;
     inputTypes['default/mshv'] = 9; 
     //inputTypes['default/ft8play'] = 8; // TODO
     inputTypes['default/ft8lib'] = 7;

@@ -428,6 +428,7 @@ function initializeUI() {
                 if (typeInfo != null && typeInfo.startsWith('default/')) {
                     typeInfo = typeInfo.slice(8);
                     if (typeInfo == 'ft8lib') typeInfo = 'ft8_lib';
+                    if (typeInfo == 'wsjtx') typeInfo = 'WSJT-X';
                 }
 
                 if (msg.packetType == 'spp') {

@@ -1,4 +1,5 @@
 import { hashCallsign, hashBitsToZ32Dense } from "./ft8_extra.js";
+import { wsjtxSaveHashCall } from "./wsjtx/wsjtx_engine.js";
 //import * as extra from "./ft8_extra.js";
 
 export const hashes = {};
@@ -40,6 +41,7 @@ export function addHash(callsign) {
         if (mshvft8 !== null) {
             mshvft8.saveHash(callsign);
         }
+        wsjtxSaveHashCall(callsign);
     }
 }
 

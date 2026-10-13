@@ -1700,6 +1700,9 @@ export const inputTypeDescriptions = {
     '79 symbols': 'Full FSK tone data',
     'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
     'default': 'FT8 message text',
+    'default/wsjtx': 'FT8 message text, packed by WSJT-X 2.7.0 code',
+    'default/mshv': 'FT8 message text, packed by MSHV',
+    'default/ft8lib': 'FT8 message text, packed by ft8_lib',
 };
 
 export function normalizeMessage(message) {

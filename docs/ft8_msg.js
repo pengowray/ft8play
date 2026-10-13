@@ -3,6 +3,7 @@ import * as extra from "./ft8_extra.js";
 import * as hashmgr from "./ft8_hashmgr.js";
 import FT8LIB from "./ft8_ft8lib.js";
 import MSHVFT8 from "./mshv_ft8_wrap.js";
+import { wsjtxEncode, wsjtxDecode, WSJTX_VERSION } from "./wsjtx/wsjtx_engine.js";
 
 const ft8lib = new FT8LIB();
 const mshvft8 = new MSHVFT8();
@@ -41,6 +42,14 @@ class FT8Message extends EventTarget {
             } else {
                 throw new Error(`Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
             }
+
+        } else if (encoder === 'wsjtx') {
+            const result = wsjtxEncode(text);
+            if (!result.success) {
+                throw new Error(`WSJT-X ${WSJTX_VERSION} could not pack this message (it would show "*** bad message ***")`);
+            }
+            this.wsjtxEncodeResult = result;
+            this.initBits(result.c77);
 
         } else if (encoder === 'mshv') {
             const mshvPackingResult = mshvft8.packMessage(text);
@@ -94,9 +103,21 @@ class FT8Message extends EventTarget {
 
         // re-encoding messages
         
-        //TODO: use both / use consistant format
-        //TODO: add ft8play decode
-        //TODO: should it use hashmgr?
+        // WSJT-X: for text encoded by WSJT-X, use the text genft8 reports as sent (as ft8code shows it).
+        // Otherwise unpack the bits with the shared receive-side state, which knows calls seen so far.
+        if (this.wsjtxEncodeResult) {
+            this.wsjtxDecodedResult = { success: true, decodedText: this.wsjtxEncodeResult.msgsent };
+        } else {
+            try {
+                const r = wsjtxDecode(this.bits, 1);
+                this.wsjtxDecodedResult = r.success
+                    ? { success: true, decodedText: r.msg }
+                    : { success: false, error: true, errorMessage: r.msg || 'unpack77 failed', decodedText: null };
+            } catch (e) {
+                this.wsjtxDecodedResult = { success: false, error: true, errorMessage: e.message, decodedText: null };
+            }
+        }
+
         this.ft8libDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
         
         // translate into ft8libDecodedResult format; TODO: should be other way around
@@ -107,7 +128,8 @@ class FT8Message extends EventTarget {
             this.mshvDecodedResult = {success: false, error: true, result: 'error', errorMessage: resultMshv?.message, errorCode: resultMshv.errorCode, decodedText: null };
         }
 
-        this.bestDecodedResult = this.mshvDecodedResult?.success ? this.mshvDecodedResult : (this.ft8libDecodedResult?.success ? this.ft8libDecodedResult : this.mshvDecodedResult);
+        this.bestDecodedResult = [this.wsjtxDecodedResult, this.mshvDecodedResult, this.ft8libDecodedResult].find(r => r?.success)
+            ?? this.wsjtxDecodedResult;
     }
 
     bestDecodedResultFromExpected(expectedResults) {
@@ -150,6 +172,8 @@ class FT8Message extends EventTarget {
       this.encodeError = null;
 
       // results of decoding final packed message
+      this.wsjtxEncodeResult = null; // { c77, i3, n3, msgsent, success } when encoded by the WSJT-X port
+      this.wsjtxDecodedResult = null;
       this.ft8libDecodedResult = null;
       this.mshvDecodedResult = null;
       this.bestDecodedResult = null;

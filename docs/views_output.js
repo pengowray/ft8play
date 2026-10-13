@@ -276,12 +276,7 @@ export class OutputComponent extends Component {
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
                 
-                ${data.mshvDecodedResult.success ? 
-                    this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'mshv', value: data.decodedText_mshv}) :
-                    this.renderRowDataField({label: 'Decode error', secondaryLabel: 'mshv', value: data.mshvDecodedResult.errorMessage, isField: false})}
-                ${data.ft8libDecodedResult.success ? 
-                    this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'ft8_lib', value: data.decodedText_ft8lib, desc: data.decodedText_mshv.includes('<...>') || data.decodedText_ft8lib.includes('<...>') ? '<...> represents a hashed callsign.' : null }) :
-                    this.renderRowDataField({label: 'Decode error', secondaryLabel: 'ft8_lib', value: data.ft8libDecodedResult.errorMessage, isField: false})}
+                ${this.renderDecodedTextRows()}
 
                 ${data.explanation ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
@@ -295,6 +290,34 @@ export class OutputComponent extends Component {
 
         this.container.innerHTML = '';
         this.container.appendChild(outputBox);
+    }
+
+    // One row per decoder. WSJT-X is the reference; other decoders are flagged when they disagree with it.
+    renderDecodedTextRows() {
+        const msg = this.message;
+        const decoders = [
+            { name: 'WSJT-X', result: msg.wsjtxDecodedResult },
+            { name: 'mshv', result: msg.mshvDecodedResult },
+            { name: 'ft8_lib', result: msg.ft8libDecodedResult },
+        ].filter(d => d.result != null);
+        const reference = msg.wsjtxDecodedResult?.success ? msg.wsjtxDecodedResult.decodedText.trim() : null;
+        const anyHash = decoders.some(d => d.result.success && d.result.decodedText?.includes('<...>'));
+
+        return decoders.map((d, i) => {
+            const r = d.result;
+            if (!r.success) {
+                return this.renderRowDataField({ label: 'Decode error', secondaryLabel: d.name, value: r.errorMessage || 'failed', isField: false });
+            }
+            const text = r.decodedText.trim();
+            let subtype = null;
+            if (d.name !== 'WSJT-X' && reference != null && text !== reference) {
+                subtype = normalizeMessageAndHashes(text) === normalizeMessageAndHashes(reference)
+                    ? 'Differs from WSJT-X in hashed callsigns only'
+                    : 'Differs from WSJT-X';
+            }
+            const desc = (i === decoders.length - 1 && anyHash) ? '<...> represents a hashed callsign.' : null;
+            return this.renderRowDataField({ label: 'Decoded text', secondaryLabel: d.name, value: r.decodedText, subtype, desc });
+        }).join('');
     }
 
     renderSubheading(text) {
