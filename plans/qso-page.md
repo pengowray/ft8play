@@ -1,6 +1,14 @@
 # Plan: two-way FT8 page (TX and RX)
 
-Status: plan only, nothing built yet. Written 2026-10-13, updated 2026-10-14.
+Status: receiving works (steps 1 and 2 below), at `docs/qso/` (live at /qso/). Written 2026-10-13, updated 2026-10-14.
+
+Built so far: ft8_lib's decoder in wasm (`docs/ft8_rx.js`, checked against native ft8_lib on 69 recordings), the slot clock with DT-based correction, a JS port of `gen_ft8wave`, and the page: sound card, test-signal and audio-file inputs, waterfall, band activity.
+
+Known limits:
+- The sound card input is untested with a real radio, and on Android.
+- Firefox will probably refuse the sound card input: the page asks for a 12 kHz AudioContext, and Firefox doesn't resample a microphone to a different rate (Chromium does). Fix: open the context at the device rate and decimate to 12 kHz in JS.
+- No way to set the clock offset by hand yet (the clock line can say "set manually", but nothing sets it).
+- The SNR scale matches synthetic signals; comparing with current WSJT-X on the same recording is still to do.
 
 Goal: a second page, `docs/qso/index.html` (served at `/qso/`), that can hold a complete FT8 QSO in the browser.
 Stage 1 uses audio only: a sound card or an SDR for receive, a sound card for transmit, manual PTT or VOX.
@@ -202,8 +210,8 @@ docs/qso/radio/rigctld.js         (later)
 
 ## Order of work
 
-1. Slot clock, sound card input and waterfall (no decoding yet). Check levels with a QMX.
-2. ft8_lib decoder in a worker; decode recorded WAVs.
+1. ~~Slot clock, sound card input and waterfall.~~ Done; check levels with a QMX.
+2. ~~ft8_lib decoder in a worker; decode recorded WAVs.~~ Done.
 3. RTL-SDR source (V4 first): decode real FT8 off-air with a wire antenna, on desktop and on an Android phone. No licence or TX antenna needed.
 4. TX: port `gen_ft8wave`, sound card sink, Kenwood CAT PTT. Bench QSO between the two QMXs into dummy loads, with the RTL-SDR (heavily attenuated) as a monitor.
 5. Sequencer with unit tests; full bench QSO, then on-air once the antenna is up.

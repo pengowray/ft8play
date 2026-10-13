@@ -25,6 +25,7 @@ const bandActivity = new BandActivity(document.querySelector('.band-activity'), 
 let source = null;       // running live source
 let sourceKind = null;   // 'soundcard' | 'test' while running
 let lastError = '';
+let pendingFile = null;  // { label, seconds } while an audio file is being decoded
 
 // ---- My station ----
 const myCallInput = $('my-call');
@@ -52,6 +53,13 @@ pipeline.addEventListener('row', (e) => waterfall.addRow(e.detail.row));
 pipeline.addEventListener('decodes', (e) => {
     const result = e.detail;
     bandActivity.addSlot(result);
+    if (pendingFile && result.label === pendingFile.label) {
+        const { label, seconds } = pendingFile;
+        pendingFile = null;
+        setState(seconds > clock.mode.slotSeconds + 1
+            ? `Decoded the first 15 s of ${label} (${seconds.toFixed(0)} s long)`
+            : `Decoded ${label}`);
+    }
     // Correct the clock from received signals, but not from simulated ones.
     if (sourceKind === 'soundcard' && typeof result.slot === 'number') {
         clock.addSlotDts(result.slot, result.decodes.filter(d => d.snr == null || d.snr > -18).map(d => d.dt));
@@ -110,10 +118,9 @@ $('file-input').addEventListener('change', async (e) => {
         await pipeline.start();
         const { samples, seconds } = await readAudioFile(file, clock.mode.sampleRate);
         // Show the recording on the waterfall, one row per block, by feeding it like live audio.
+        // The status changes to "Decoded" when the decoder's results arrive (see the 'decodes' handler).
+        pendingFile = { label: file.name, seconds };
         pipeline.decodeRecording(samples, file.name);
-        setState(seconds > clock.mode.slotSeconds + 1
-            ? `Decoded the first 15 s of ${file.name} (${seconds.toFixed(0)} s long)`
-            : `Decoded ${file.name}`);
     } catch (err) {
         showError(`Could not read ${file.name}: ${err.message}`);
     }
