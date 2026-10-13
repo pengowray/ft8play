@@ -4,7 +4,7 @@
 
 I made this webpage which will pack text into an FT8 message and let you explore the resulting data, signals and audio. It's an experiment in information design, a way to learn about FT8, a tool to test and debug FT8 software, and if you're an amateur radio operator, you can use it to better understand what you're transmitting and receiving. It's also something I can point to and say 'I made this'.
 
-Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. Everything runs locally in a web page (it doesn't send inputs anywhere). The majority of the source code is plain Javascript. It supports most FT8 message types with complete breakdowns of every field.
+Web technology and development tools have been evolving dramatically, and this project was partly to test what was possible now. I've forked the libraries FT8_lib (a lightweight C library originally designed for embedded systems) and MSHV (a C++ port of WSJT-X, the original FT8 software written in Fortran). I've compiled them both into web assembly modules, with much custom code to wrap, extend the libraries and visualize the output in FT8 Player. FT8 Player also includes a JavaScript port of WSJT-X's own message packing code (`packjt77.f90` from WSJT-X 2.7.0), checked bit for bit against the original Fortran, and uses it as the default. Everything runs locally in a web page (it doesn't send inputs anywhere). The majority of the source code is plain Javascript. It supports most FT8 message types with complete breakdowns of every field.
 
 I don't have plans to add audio decoding at this stage, though I do keep pondering the idea of building a full QSO-capable app that would run on a web browser on your phone, and connect to a radio through web serial.
 
@@ -105,7 +105,8 @@ Payload/symbol input formats: (for debugging or advanced uses)
 - [X] have suggestions for alternative encoding methods when available
 - [ ] save the user's call and grid in a cookie if they like
 - [ ] optimizations
-- [ ] update MSHV to latest + better test coverage for Qt string replacement code
+- [X] update MSHV to latest
+- [ ] better test coverage for MSHV's Qt string replacement code
 - [ ] FFT visualization
 - [ ] lots of other things, but it's largely working and has the basics, so I'm happy to leave it as is for now.
 
@@ -117,7 +118,7 @@ Software libraries and data sources used:
  - [D3 javascript library](https://d3js.org/) ([ISC](https://github.com/d3/d3/blob/main/LICENSE))
  - [HamGridSquare.js](https://gist.github.com/stephenhouser/4ad8c1878165fc7125cb547431a2bdaa) (MIT) by Paul Brewer KI6CQ
  - [AD1C's _Contest Country Files_](https://www.country-files.com/contest/) (MIT) — ft8play includes `CTY.CSV` <!-- (same format as Aether/KLog) -->to show the country of a callsign.
- - WSJT / WSJT-X (GPLv3) — the original FT8 software. Although not used directly in this project, I have referenced the Fortran source, as have the authors of MSHV and FT8_lib. WSJT-X is the most widely used FT8 software and is considered the reference implementation of the FT8 protocol.
+ - WSJT / WSJT-X (GPLv3) — the original FT8 software. FT8 Player includes a JavaScript port of its message packing code (`packjt77.f90`, WSJT-X 2.7.0) in [docs/wsjtx](docs/wsjtx/). The authors of MSHV and FT8_lib have also referenced the Fortran source. WSJT-X is the most widely used FT8 software and is considered the reference implementation of the FT8 protocol.
  
 Thank you to the authors and contributors of these libraries and data sources—Joe Taylor K1JT and Steve Franke K9AN, who developed the FT8 protocol and WSJT-X, Karlis Goba YL3JG who created ft8_lib, Christo LZ2HV who ported WSJTX to C++ and develops MSHV, Jim Reisert AD1C who maintains the Amateur Radio Country Files, and the many other contributors who have collectively made this project possible.
 
@@ -140,11 +141,11 @@ Thank you to the authors and contributors of these libraries and data sources—
 - All processing is done on your local machine or device. Your input is not sent anywhere.
 
 ## Licensing notes
-- This project is Copyright 2024 Pengo Wray. It is dual licensed under GPLv3 and additionally, if used without the MSHV module, under [MIT](https://github.com/pengowray/ft8play/blob/main/LICENSE).
-- All code is MIT licensed with the exceptions of the D3.js library, which uses the MIT-like [ISC](https://github.com/d3/d3/blob/main/LICENSE); and the MSHV-based code, which is licensed under GPLv3 (as is the WSJT/WSJT-X code it is based on).
+- This project is Copyright 2024 Pengo Wray. It is dual licensed under GPLv3 and additionally, if used without the MSHV module and the WSJT-X port, under [MIT](https://github.com/pengowray/ft8play/blob/main/LICENSE).
+- All code is MIT licensed with the exceptions of the D3.js library, which uses the MIT-like [ISC](https://github.com/d3/d3/blob/main/LICENSE); and the MSHV-based code and the WSJT-X port (`docs/wsjtx/packjt77.js`), which are licensed under GPLv3 (as is the WSJT/WSJT-X code they are based on).
 - My wrapper code and additions to the MSHV code are also dual MIT and GPLv3 licensed ([github link](https://github.com/pengowray/MSHV/tree/wasm/wasm))
 - My additions to [ft8_lib](https://github.com/kgoba/ft8_lib), are MIT licensed, like the original ([github link](https://github.com/pengowray/ft8_lib/tree/wasm/wasm))
-- If you fork this project as a whole without removing the MSHV code, then your project must also be made available under GPLv3. If you remove the MSHV code, then you can follow the more relaxed MIT licensing.
+- If you fork this project as a whole without removing the MSHV code and the WSJT-X port, then your project must also be made available under GPLv3. If you remove them, then you can follow the more relaxed MIT licensing.
 - If you fork this project, do not use my name or callsigns in the fork's name without permission, but do link back to [VK3PGO FT8 Player](https://github.com/pengowray/ft8play).
 
 ## Where can I use VK3PGO's FT8 Player? 

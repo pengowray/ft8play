@@ -6,7 +6,7 @@ import MSHVFT8 from "./mshv_ft8_wrap.js";
 import { wsjtxEncode, wsjtxDecode, WSJTX_VERSION } from "./wsjtx/wsjtx_engine.js";
 
 const ft8lib = new FT8LIB();
-const mshvft8 = new MSHVFT8();
+const mshvft8 = new MSHVFT8(() => hashmgr.setMshvft8(mshvft8));
 
 class FT8Message extends EventTarget {
 
@@ -215,9 +215,6 @@ class FT8Message extends EventTarget {
       // ViewManager for reporting audio stop/start/queued/etc
       this.viewManager = null;
 
-      if (hashmgr && hashmgr.mshvft8 == null) {
-          hashmgr.setMshvft8(mshvft8);
-      }
       
       //this.hashes = hashmgr.hashes;
 

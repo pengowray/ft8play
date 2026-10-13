@@ -3,6 +3,7 @@ import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, inputTypeDescriptio
 import * as extra from "./ft8_extra.js";
 import { explainFT8Message } from './ft8_explain.js';
 import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
+import { WSJTX_VERSION } from './wsjtx/wsjtx_engine.js';
 
 const REFERENCE = 'expected';
 const DECODED = 'found';
@@ -310,11 +311,20 @@ export class OutputComponent extends Component {
             const text = r.decodedText.trim();
             let subtype = null;
             if (d.name !== 'WSJT-X' && reference != null && text !== reference) {
-                subtype = normalizeMessageAndHashes(text) === normalizeMessageAndHashes(reference)
-                    ? 'Differs from WSJT-X in hashed callsigns only'
-                    : 'Differs from WSJT-X';
+                if (text.toUpperCase() === reference.toUpperCase()) {
+                    subtype = 'Differs from WSJT-X in letter case only';
+                } else if (normalizeMessageAndHashes(text) === normalizeMessageAndHashes(reference)) {
+                    subtype = 'Differs from WSJT-X in hashed callsigns only';
+                } else {
+                    subtype = 'Differs from WSJT-X';
+                }
             }
-            const desc = (i === decoders.length - 1 && anyHash) ? '<...> represents a hashed callsign.' : null;
+            let desc = (i === decoders.length - 1 && anyHash) ? '<...> represents a hashed callsign.' : null;
+            const uninitialised = d.name === 'WSJT-X' ? msg.wsjtxEncodeResult?.uninitialised : null;
+            if (uninitialised?.length) {
+                subtype = 'Real WSJT-X may send different bits';
+                desc = `To pack this message, WSJT-X ${WSJTX_VERSION} reads variables that its code never sets, so the result depends on leftover memory. FT8 Player uses 0 or blanks for them.\nDetails: ${uninitialised.join('; ').replace(/JS assumes/g, 'FT8 Player uses')}`;
+            }
             return this.renderRowDataField({ label: 'Decoded text', secondaryLabel: d.name, value: r.decodedText, subtype, desc });
         }).join('');
     }

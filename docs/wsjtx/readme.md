@@ -8,9 +8,9 @@ The port keeps WSJT-X's behaviour exactly, including its known quirks. For examp
 
 ## How it was checked
 
-The port was compared with the original Fortran, compiled with gfortran 14 using WSJT-X's release compiler flags. The comparison covered more than 340,000 commands: every message in the WSJT-X test lists, random messages of every type, random 77-bit strings, and sequences that build up hash tables and set My Call and DX Call. Every output matched: the 77 bits, the message type, the decoded text and the success flag. The test programs are in [`tools/wsjtx-oracle`](https://github.com/pengowray/ft8play/tree/main/tools/wsjtx-oracle).
+The port was compared with the original Fortran, compiled with gfortran 14 using WSJT-X's release compiler flags. The comparison covered 489,776 commands: every message in the WSJT-X test lists, random messages of every type, random 77-bit strings, and sequences that build up hash tables and set My Call and DX Call. Every output matched: the 77 bits, the message type, the decoded text and the success flag. The test programs are in [`tools/wsjtx-oracle`](https://github.com/pengowray/ft8play/tree/main/tools/wsjtx-oracle).
 
-In some invalid messages, WSJT-X reads variables that were never set, so its output depends on leftover memory. The port uses 0 for those variables, which matches gfortran with `-finit-local-zero`.
+In some invalid messages, WSJT-X reads variables that were never set, so its output depends on leftover memory (about 1 in 90 of the generated commands). The port uses 0 for those variables, which matches gfortran with `-finit-local-zero`, and FT8 Player flags these messages. One input, `CQ 12.3 K1ABC`, stops WSJT-X's Fortran code with a runtime error; the port reports the same error.
 
 ## Source Code and License
 

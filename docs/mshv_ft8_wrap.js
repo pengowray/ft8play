@@ -50,7 +50,9 @@ class MSHVFT8 {
 
   saveHash(call, instanceIndex = 1) {
     if (!this.module) throw new Error("Module not initialized");
-    this.saveHashCall(call, instanceIndex);
+    // MSHV hashes the first 11 characters and expects the call to be followed by
+    // blanks, as MSHV itself passes it (call + 12 spaces); an unpadded call hashes wrongly.
+    this.saveHashCall(call.trim() + ' '.repeat(12), instanceIndex);
   }
 }
 

@@ -1,6 +1,6 @@
 // Connects the WSJT-X packjt77 port to FT8 Player.
 
-import { PackJT77, fmtmsg, genft8Message } from './packjt77.js';
+import { PackJT77, fmtmsg, genft8Message, FortranRuntimeError } from './packjt77.js';
 
 export const WSJTX_VERSION = '2.7.0';
 
@@ -13,12 +13,22 @@ function toMsg37(text) {
  * Encode text exactly as WSJT-X's ft8code utility does: fmtmsg, then genft8
  * (pack77, then unpack77 with nrx=0 to get the text actually sent), starting
  * from empty hash tables. Only calls in the message itself are known.
- * @returns {{c77: string, i3: number, n3: number, msgsent: string, success: boolean}}
+ * `uninitialised` lists the places where WSJT-X read a variable it never set
+ * (the port used 0 or blanks); real WSJT-X may produce different bits for these.
+ * @returns {{c77: string, i3: number, n3: number, msgsent: string, success: boolean, uninitialised: string[]}}
  */
 export function wsjtxEncode(text) {
     const state = new PackJT77();
-    const r = genft8Message(state, fmtmsg(toMsg37(text)));
-    return { ...r, msgsent: r.msgsent.trimEnd() };
+    let r;
+    try {
+        r = genft8Message(state, fmtmsg(toMsg37(text)));
+    } catch (e) {
+        if (e instanceof FortranRuntimeError) {
+            throw new Error(`WSJT-X ${WSJTX_VERSION} stops on this message with a Fortran runtime error, which ends the program. ${e.message}`);
+        }
+        throw e;
+    }
+    return { ...r, msgsent: r.msgsent.trimEnd(), uninitialised: [...state.lastUB] };
 }
 
 // Receive side: one long-lived WSJT-X state that knows every callsign FT8 Player

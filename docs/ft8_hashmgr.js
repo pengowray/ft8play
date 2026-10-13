@@ -4,9 +4,13 @@ import { wsjtxSaveHashCall } from "./wsjtx/wsjtx_engine.js";
 
 export const hashes = {};
 
+// MSHV's wasm module loads asynchronously. Calls added before it is ready are
+// kept here and passed to it when ft8_msg.js calls setMshvft8().
 export let mshvft8 = null;
+const savedCalls = new Set();
 export function setMshvft8(mshvft8_) {
     mshvft8 = mshvft8_;
+    for (const call of savedCalls) mshvft8.saveHash(call);
 }
 
 export function addHash(callsign) {
@@ -38,6 +42,7 @@ export function addHash(callsign) {
         hashes[zhash.slice(0, 3)] = entry; // 12 bits
         hashes[zhash.slice(0, 2)] = entry; // 10 bits
 
+        savedCalls.add(callsign);
         if (mshvft8 !== null) {
             mshvft8.saveHash(callsign);
         }
