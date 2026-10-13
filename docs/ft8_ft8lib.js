@@ -6,8 +6,9 @@ export const FT8_NN = 79; // Total channel symbols
 class FT8Lib {
   constructor(readyCallback) {
     create_ft8lib_module({
+      // Resolve against this file, not the page, so pages in other folders (e.g. /qso/) work too.
       locateFile: function(path, prefix) {
-        if (path.endsWith('.wasm')) return './ft8lib/' + path;
+        if (path.endsWith('.wasm')) return new URL('./ft8lib/' + path, import.meta.url).href;
         return prefix + path;
       }
     }).then(module => {

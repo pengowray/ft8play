@@ -3,8 +3,9 @@ import createMshvFT8Module from './mshv/mshv_ft8.js';
 class MSHVFT8 {
   constructor(readyCallback) {
     createMshvFT8Module({
+      // Resolve against this file, not the page, so pages in other folders (e.g. /qso/) work too.
       locateFile: function(path, prefix) {
-        if (path.endsWith('.wasm')) return './mshv/' + path;
+        if (path.endsWith('.wasm')) return new URL('./mshv/' + path, import.meta.url).href;
         return prefix + path;
       }
     }).then(module => {

@@ -6,7 +6,7 @@ ft8_lib is written in C and is designed to be used in amateur radio software. It
 
 ## Version
 
-This build is based on ft8_lib commit [9fec6ca](https://github.com/kgoba/ft8_lib/commit/9fec6ca39886edbf96f4f5e71edc76da5074e871) from 23 August 2025 ("non-standard callsigns; special CQ; field type annotation"), the latest upstream commit when the build was made. It was compiled with Emscripten 6.0.12 on 13 October 2026, from the _wasm_ branch of the fork at commit a02161f.
+This build is based on ft8_lib commit [9fec6ca](https://github.com/kgoba/ft8_lib/commit/9fec6ca39886edbf96f4f5e71edc76da5074e871) from 23 August 2025 ("non-standard callsigns; special CQ; field type annotation"), the latest upstream commit when the build was made. It was compiled with Emscripten 6.0.12 on 14 October 2026, from the _wasm_ branch of the fork at commit 3777168, which adds a streaming audio decoder (`rxft8`, used by `ft8_rx.js`).
 
 ## Source Code and License
 
