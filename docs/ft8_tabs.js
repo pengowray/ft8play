@@ -85,13 +85,15 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
             message.initBits(input);
             return;
         case '80 bits':
-        case '82 bits':
+        case '82 bits': {
+            const bitStr = input;
             const zeroPadding = bitStr.slice(77);
             if (zeroPadding != '000' && zeroPadding != '00000') {
                 throw new Error(`Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr.slice(0,77)} ${zeroPadding}`);
             }
             message.initBits(bitStr.slice(0, 77));
             return;
+        }
         case '91 bits':
             message.initSymbolsText(extra.binary91ToSymbols(input));
             return;
