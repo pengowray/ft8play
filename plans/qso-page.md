@@ -18,7 +18,7 @@ The existing FT8 Player page stays as it is. The new page reuses its modules whe
 | Play at the next slot | `FT8Message.queueAudio()` | Uses the device clock and `getSeconds()`; needs replacing with a slot clock (below). |
 | Clock check | `docs/timekeep.js` (untracked work in progress) | HTTP `Date` headers only give 1 second resolution. |
 | Decoder | none in the page | ft8_lib has one in C (`ft8/decode.c`, `demo/decode_ft8.c`). MSHV has a C++ port of the WSJT-X decoder (`src/HvDecoderMs/decoderft8.cpp`, 2,670 lines) with bundled FFTW. |
-| Rig control reference | none | MSHV `src/HvRigControl/` has CAT command tables for many radios (GPL, C++), useful as a reference for the serial protocols. |
+| Rig control | none | Hamlib (LGPL) is the standard library for this; see section 9. MSHV `src/HvRigControl/` also has CAT command tables for many radios (GPL, C++). |
 
 ## Stage 1: audio only
 
@@ -79,12 +79,25 @@ Web Serial works in Chromium desktop browsers. Firefox and Safari have no Web Se
 - CAT PTT (below) for radios with built-in USB codecs.
 
 ### 9. CAT (`qso/radio/*.js`)
-One small module per protocol family, same interface: `connect`, `setPtt(on)`, `getFrequency`, `setFrequency(hz)`, `setMode('DATA-USB')`.
+Same interface whichever option is used: `connect`, `setPtt(on)`, `getFrequency`, `setFrequency(hz)`, `setMode('DATA-USB')`.
+
+**Option A: Hamlib compiled to wasm (preferred if the spike works).** [Hamlib](https://hamlib.github.io/) is the rig control library used by WSJT-X, JTDX, fldigi and most other ham software. It supports 300+ radios and already handles each radio's quirks (CI-V addresses, command timing, radios that drop CAT during TX).
+- Licence: the library is LGPL-2.1, which is compatible with this project's GPLv3. Linking it statically into a wasm module is fine as long as the source and build scripts are published, which they would be.
+- Work needed: Hamlib does serial I/O with file descriptors, termios and `select()` timeouts, all synchronous. Web Serial is promise-based. The bridge is a small Hamlib port backend (or a patch to `iofunc.c`/`serial.c`) whose read and write call JavaScript, made synchronous from C with Emscripten Asyncify or JSPI (JavaScript Promise Integration, in Chromium since 2025). Configure Hamlib without threads, USB (libusb) and network backends.
+- Run it in a Web Worker, so slow serial reads never block the page.
+- I don't know of a maintained wasm build of Hamlib, so start with a spike: build `rig_open`, `rig_set_freq`, `rig_get_freq` and `rig_set_ptt` for one radio, and check timing against the real radio.
+
+**Option B: Hamlib's `rigctld` on the user's computer.** Browsers can't open TCP sockets, so this needs a WebSocket bridge (for example websockify) as well as rigctld. It works in any browser, including Firefox and Safari, which have no Web Serial, but needs installed software. Worth supporting later as a fallback, since rigctld's text protocol is simple.
+
+**Option C: hand-written modules for the main protocol families.** Fallback if the Hamlib spike fails, or for a first test before it:
 - Kenwood and Elecraft text protocol (`FA00014074000;`, `TX;`, `RX;`).
 - Yaesu newer text protocol (FT-991A, FTDX10, FT-710: `FA014074000;`, `TX1;`, `TX0;`).
 - Icom CI-V binary frames (`FE FE <radio addr> E0 <cmd> ... FD`; PTT is command `1C 00`).
+
+For all options:
 - Band and frequency picker with the standard FT8 dial frequencies.
-- Poll frequency every second while idle; never poll during TX on radios that drop CAT during TX.
+- Poll frequency every second while idle; don't poll during TX on radios that drop CAT during TX.
+- RTS/DTR PTT (section 8) stays hand-written; it is two lines of Web Serial.
 
 ## Suggested module layout
 
@@ -96,7 +109,9 @@ docs/qso/decoder_worker.js  (+ ft8 decoder wasm)
 docs/qso/sequencer.js
 docs/qso/tx.js              (+ gen_ft8wave port)
 docs/qso/log_adif.js
-docs/qso/radio/serial.js, kenwood.js, yaesu.js, icom_civ.js
+docs/qso/radio/serial.js     (Web Serial, RTS/DTR PTT)
+docs/qso/radio/hamlib/       (Hamlib wasm + Web Serial I/O bridge, in a worker)
+docs/qso/radio/rigctld.js    (later: rigctld over a WebSocket bridge)
 ```
 
 ## Order of work
@@ -106,7 +121,7 @@ docs/qso/radio/serial.js, kenwood.js, yaesu.js, icom_civ.js
 3. TX of a fixed message at the right slot; loopback test into the decoder.
 4. Sequencer with unit tests; full QSO with VOX or manual PTT.
 5. RTS/DTR PTT over Web Serial.
-6. CAT for one radio family the user owns, then the others.
+6. Hamlib wasm spike for the user's radio (option A). If it works, use Hamlib for all CAT; if not, hand-written modules (option C).
 7. Better decoder (MSHV port).
 
 ## Open questions for later
