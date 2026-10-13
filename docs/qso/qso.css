@@ -1,0 +1,137 @@
+:root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1b1f24;
+    --muted: #5b6470;
+    --line: #d8dde3;
+    --accent: #1f6feb;
+    --accent-text: #ffffff;
+    --to-me-bg: #fff1c2;
+    --to-me-edge: #c98a00;
+    --cq-bg: #eaf4ea;
+    --slot-bg: #eef1f5;
+    --bar-bg: #dfe4ea;
+    --bar-fill: #1f6feb;
+    --bar-decode: #c98a00;
+    --focus: #1f6feb;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #0f1216;
+        --panel: #171b21;
+        --text: #e6e9ee;
+        --muted: #9aa4b1;
+        --line: #2a313a;
+        --accent: #4c8dff;
+        --accent-text: #0b0e12;
+        --to-me-bg: #4a3a0a;
+        --to-me-edge: #f0b429;
+        --cq-bg: #16301c;
+        --slot-bg: #1d232b;
+        --bar-bg: #2a313a;
+        --bar-fill: #4c8dff;
+        --bar-decode: #f0b429;
+        --focus: #8ab4ff;
+    }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.top {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+    padding: 8px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+}
+.title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0; }
+.stage { color: var(--muted); font-size: 13px; }
+.back { font-size: 13px; color: var(--accent); }
+
+.clock { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.utc { font: 600 22px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.slot { display: flex; align-items: center; gap: 8px; }
+.slot-bar { position: relative; width: 150px; height: 10px; background: var(--bar-bg); border-radius: 5px; overflow: hidden; }
+.slot-fill { height: 100%; width: 0; background: var(--bar-fill); }
+.slot-decode { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bar-decode); }
+.slot-label, .clock-offset { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 12px 16px 40px; }
+section, details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+h2 { font-size: 15px; margin: 0 0 6px; }
+.help, .caption { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+.caption { margin: 0 0 8px; }
+
+.rx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rx-status { margin-top: 8px; }
+.source { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.source label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; }
+.source label + label { border-left: 1px solid var(--line); }
+.source label:has(input:checked) { background: var(--accent); color: var(--accent-text); }
+/* The filled button shows the choice, so the radio circles are hidden (but still focusable). */
+.source input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.source label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: -2px; }
+button, select, input:not([type="radio"]) {
+    font: inherit; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; min-height: 40px;
+}
+button { cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: 0.5; cursor: default; }
+.rx-state { font-weight: 600; }
+.rx-state.running::before { content: "● "; color: #2ea043; }
+.rx-state.error { color: #d1242f; }
+.level { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.level meter { width: 120px; }
+
+.wf-frame { position: relative; }
+.waterfall canvas { display: block; width: 100%; height: 260px; image-rendering: auto; border-radius: 4px; background: #080a1e; }
+.wf-highlight { position: absolute; top: 0; bottom: 0; border: 2px solid #ffffffcc; border-radius: 3px; pointer-events: none; }
+.wf-axis { position: relative; height: 20px; font-size: 12px; color: var(--muted); }
+.wf-tick { position: absolute; transform: translateX(-50%); white-space: nowrap; top: 2px; }
+.wf-tick.wf-tick-end { transform: translateX(-100%); }
+.wf-tick.wf-tick-end::before { left: 100%; }
+.wf-tick.wf-tick-minor { width: 0; }
+.wf-tick::before { content: ""; position: absolute; left: 50%; top: -4px; height: 4px; border-left: 1px solid var(--muted); }
+
+.band-activity table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.band-activity th, .band-activity td { text-align: right; padding: 3px 8px; white-space: nowrap; width: 1%; }
+.band-activity .ba-msg { text-align: left; width: auto; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: normal; overflow-wrap: anywhere; }
+.band-activity thead th { color: var(--muted); font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--line); }
+.ba-slot th { text-align: left; background: var(--slot-bg); color: var(--muted); font-weight: 600; font-size: 13px; padding-top: 5px; padding-bottom: 5px; }
+.ba-to-me td { background: var(--to-me-bg); font-weight: 600; }
+.ba-to-me td:first-child { box-shadow: inset 4px 0 0 var(--to-me-edge); }
+.ba-cq td { background: var(--cq-bg); }
+.ba-tag { margin-left: 8px; font: 600 11px system-ui, sans-serif; padding: 1px 6px; border-radius: 9px; background: var(--to-me-edge); color: #000; vertical-align: 1px; }
+.ba-none { color: var(--muted); text-align: left !important; }
+.ba-empty { color: var(--muted); }
+.band-activity tbody tr:not(.ba-slot):hover td { outline: 1px solid var(--line); }
+
+.station summary { cursor: pointer; font-weight: 600; }
+.station-fields { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.station-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.station-fields input { text-transform: uppercase; width: 12em; }
+
+@media (max-width: 640px) {
+    .top { padding: 6px 12px; }
+    main { padding: 8px 8px 32px; }
+    .stage { display: none; }
+    .slot-bar { width: 90px; }
+    .waterfall canvas { height: 170px; }
+    /* UTC is in each slot's header row, and DT matters less on a small screen. */
+    .band-activity thead th:nth-child(1), .band-activity tbody td:nth-child(1),
+    .band-activity thead th:nth-child(3), .band-activity tbody td:nth-child(3) { display: none; }
+    .band-activity tbody td.ba-none { display: table-cell; }
+    .band-activity th, .band-activity td { padding: 3px 5px; }
+    .source label { padding: 8px 10px; }
+}

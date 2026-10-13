@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FT8 QSO (receive)</title>
+    <link href="qso.css" rel="stylesheet">
+</head>
+<body>
+<header class="top">
+    <div class="title">
+        <h1>FT8 QSO</h1>
+        <span class="stage">Receive only, work in progress</span>
+        <a class="back" href="../">FT8 Player</a>
+    </div>
+    <div class="clock" aria-live="off">
+        <time id="utc" class="utc">--:--:--</time>
+        <div class="slot">
+            <div class="slot-bar" role="progressbar" aria-label="Time into the current 15 second slot" aria-valuemin="0" aria-valuemax="15">
+                <div class="slot-fill"></div>
+                <div class="slot-decode" title="Decoding starts here"></div>
+            </div>
+            <span id="slot-label" class="slot-label"></span>
+        </div>
+        <span id="clock-offset" class="clock-offset"></span>
+    </div>
+</header>
+
+<main>
+    <section class="rx" aria-labelledby="rx-heading">
+        <h2 id="rx-heading" class="visually-hidden">Receive</h2>
+        <div class="rx-row">
+            <div class="source" role="radiogroup" aria-label="Audio source">
+                <label><input type="radio" name="source" value="soundcard"> Sound card</label>
+                <label><input type="radio" name="source" value="test" checked> Test signals</label>
+                <label><input type="radio" name="source" value="file"> Audio file</label>
+            </div>
+            <select id="input-device" aria-label="Sound card input" hidden></select>
+            <button id="rx-toggle" class="primary" type="button">Start receiving</button>
+            <input id="file-input" type="file" accept=".wav,audio/*" hidden>
+        </div>
+        <div class="rx-row rx-status">
+            <span id="rx-state" class="rx-state">Stopped</span>
+            <span class="level" id="level-wrap" hidden>
+                Input level <meter id="level" min="-60" max="0" low="-40" high="-6" optimum="-20" value="-60"></meter>
+                <span id="level-db"></span>
+            </span>
+        </div>
+        <p id="source-help" class="help"></p>
+    </section>
+
+    <section class="waterfall" aria-labelledby="wf-heading">
+        <h2 id="wf-heading">Waterfall</h2>
+        <p class="caption">Frequency from left to right; newest at the top, one line every 0.16 s. Brighter means stronger. Lines across mark the start of each 15 s slot.</p>
+        <div class="wf-frame">
+            <canvas aria-label="Waterfall of received audio"></canvas>
+            <div class="wf-highlight" hidden></div>
+        </div>
+        <div class="wf-axis" aria-hidden="true"></div>
+    </section>
+
+    <section class="band-activity" aria-labelledby="ba-heading">
+        <h2 id="ba-heading">Band activity</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">UTC</th>
+                    <th scope="col" title="Signal-to-noise ratio in a 2500 Hz bandwidth (approximate)">dB</th>
+                    <th scope="col" title="Time offset from the expected start, in seconds">DT</th>
+                    <th scope="col" title="Audio frequency of the lowest tone, in Hz">Freq</th>
+                    <th scope="col" class="ba-msg">Message</th>
+                </tr>
+            </thead>
+        </table>
+        <p class="ba-empty">No messages decoded yet.</p>
+    </section>
+
+    <details class="station">
+        <summary>My station</summary>
+        <div class="station-fields">
+            <label>My call <input id="my-call" autocomplete="off" spellcheck="false" placeholder="e.g. VK3PGO"></label>
+            <label>My grid <input id="my-grid" autocomplete="off" spellcheck="false" placeholder="e.g. QF22"></label>
+        </div>
+        <p class="help">Messages that call your callsign are marked "To you". Saved in this browser only.</p>
+    </details>
+</main>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
