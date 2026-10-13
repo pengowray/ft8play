@@ -1,4 +1,4 @@
-import { hashCallsign, hashBitsToZ32Dense } from "./ft8_extra.js";
+import { hashCallsign, hashBitsToZ32Dense } from "./ft8_hashcalc.js";
 import { wsjtxSaveHashCall } from "./wsjtx/wsjtx_engine.js";
 //import * as extra from "./ft8_extra.js";
 
