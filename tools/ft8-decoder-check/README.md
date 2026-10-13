@@ -19,4 +19,4 @@ Exit code 0 when wasm and native agree on every file.
 - 69 files, 1,048 decodes: wasm and native identical on every file.
 - ft8_lib finds 933 of the 1,298 messages WSJT-X decoded (72%).
 - DT: ft8_lib's candidate time is one symbol (0.16 s) after the signal start, so `FT8Receiver.dt()` subtracts 0.16 s plus the 0.5 s nominal start. Median difference from WSJT-X's DT: 0.00 s.
-- SNR: `FT8Receiver.snr()` is calibrated to WSJT-X's scale. Median difference 0.0 dB; half of the decodes are within about 3 dB, 90% within about 8 dB. WSJT-X's own SNR is an estimate too, so treat both as approximate.
+- SNR: `FT8Receiver.snr()` gives the true SNR (within about 1 dB) for synthetic signals in white noise, with SNR defined as in WSJT-X's `ft8sim` (see `tools/qso-tests/ft8_wave.test.mjs`). On these recordings it is a median 6.4 dB higher than the SNRs in the `.txt` files, with half of the decodes within about 3 dB of that. The `.txt` files come from WSJT-X 2.1 (2019); its SNR estimate may differ from current WSJT-X's. Comparing with a recording decoded by current WSJT-X is still to do.

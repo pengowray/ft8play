@@ -9,7 +9,10 @@ import createFt8libModule from './ft8lib/ft8_wasm.js';
 
 const RESULT_SIZE = 28; // sizeof(rxft8_result_t) in wasm/src/rxft8.c
 const SNR_BASELINE_BINS = 32; // noise baseline taken within this many bins (6.25 Hz each) of the signal
-const SNR_OFFSET_DB = 6.35;   // matches WSJT-X's SNR on average (measured with tools/ft8-decoder-check)
+// Correction added to the estimate. 0 gives the true SNR for synthetic signals in white noise
+// (SNR defined as in WSJT-X's ft8sim). WSJT-X 2.1 logs of ft8_lib's test recordings (2019)
+// report about 6.4 dB lower; whether current WSJT-X does too is not yet checked.
+const SNR_OFFSET_DB = 0;
 
 /** Waterfall value (half-dB steps from -120 dB) to linear power. */
 const dbToPower = (v) => Math.pow(10, (v / 2 - 120) / 10);
@@ -125,11 +128,10 @@ export class FT8Receiver {
     }
 
     /**
-     * Approximate signal-to-noise ratio in dB in a 2500 Hz bandwidth, on WSJT-X's scale.
+     * Approximate signal-to-noise ratio in dB in a 2500 Hz bandwidth.
      * Signal: average power in the bins of the 79 transmitted tones. Noise: the 10th percentile
      * of the slot's average spectrum within 200 Hz of the signal (a local baseline, as WSJT-X
-     * uses), scaled to 2500 Hz. The offset is set so that, on ft8_lib's test recordings, the
-     * median difference from WSJT-X's SNR is 0 dB; half of the decodes are within about 3 dB.
+     * uses), scaled to 2500 Hz. See SNR_OFFSET_DB for how it compares with WSJT-X.
      */
     snr(result) {
         const tones = this.tones(result.payload);
