@@ -10,6 +10,11 @@ import { SoundCardSource, listInputDevices } from './sources/sound_card.js';
 import { readAudioFile } from './sources/wav_file.js';
 import { RtlSdrSource, FT8_DIAL_FREQUENCIES } from './sources/rtlsdr.js';
 import { FakeRtlProvider } from './sources/fake_rtlsdr.js';
+import { Transmitter } from './tx.js';
+import { QsoController } from './qso_controller.js';
+import { STATE } from './sequencer.js';
+import { PARTNER } from './sources/test_signals.js';
+import { parseMessageParts } from '../ft8_parts.js';
 
 // ?fake-rtlsdr replaces the RTL-SDR with a simulated one (for testing without hardware).
 const fakeRtl = new URLSearchParams(location.search).has('fake-rtlsdr');
@@ -23,8 +28,13 @@ const store = {
 const clock = new SlotClock();
 const pipeline = new RxPipeline({ clock });
 const waterfall = new Waterfall(document.querySelector('.waterfall'));
+const transmitter = new Transmitter({ clock });
+const qso = new QsoController({ clock, transmitter });
+let selectedDecode = null;
 const bandActivity = new BandActivity(document.querySelector('.band-activity'), {
     onHover: (d) => waterfall.showSignal(d ? d.freqHz : null),
+    onSelect: (d) => { selectedDecode = d; renderQso(); },
+    onPick: (d) => { selectedDecode = d; answerSelected(); },
 });
 
 let source = null;       // running live source
@@ -39,12 +49,15 @@ myCallInput.value = store.get('myCall');
 myGridInput.value = store.get('myGrid');
 function applyMyCall() {
     const call = myCallInput.value.trim().toUpperCase();
+    const grid = myGridInput.value.trim().toUpperCase();
     store.set('myCall', call);
+    store.set('myGrid', grid);
     pipeline.setMyCall(call);
     bandActivity.setMyCall(call);
+    qso.setStation(call, grid);
 }
 myCallInput.addEventListener('change', applyMyCall);
-myGridInput.addEventListener('change', () => store.set('myGrid', myGridInput.value.trim().toUpperCase()));
+myGridInput.addEventListener('change', applyMyCall);
 applyMyCall();
 if (!myCallInput.value) document.querySelector('.station').open = true;
 
@@ -59,6 +72,7 @@ pipeline.addEventListener('decodes', (e) => {
     const result = e.detail;
     bandActivity.addSlot(result);
     waterfall.addDecodes(result.slot, result.decodes);
+    qso.onDecodes(result);
     if (pendingFile && result.label === pendingFile.label) {
         const { label, seconds } = pendingFile;
         pendingFile = null;
@@ -228,6 +242,148 @@ function setState(text, cls = '') {
     el.className = `rx-state ${cls}`;
 }
 
+// ---- Transmit ----
+transmitter.addLoopback((tx) => { if (sourceKind === 'test') source.hear(tx); });
+
+const txFreqInput = $('tx-freq');
+txFreqInput.value = store.get('txFreq', '1500');
+function applyTxFreq() {
+    const hz = Math.max(200, Math.min(2950, Math.round(Number(txFreqInput.value) || 1500)));
+    txFreqInput.value = hz;
+    store.set('txFreq', hz);
+    qso.txFreqHz = hz;
+    waterfall.setTxFreq(hz);
+}
+txFreqInput.addEventListener('change', applyTxFreq);
+applyTxFreq();
+
+$('tx-level').value = store.get('txLevel', '0.5');
+transmitter.setLevel(Number($('tx-level').value));
+$('tx-level').addEventListener('input', (e) => { transmitter.setLevel(Number(e.target.value)); store.set('txLevel', e.target.value); });
+
+$('tx-parity').value = store.get('txParity', 'even');
+$('tx-parity').addEventListener('change', (e) => {
+    store.set('txParity', e.target.value);
+    if (qso.seq) qso.seq.txEven = e.target.value === 'even';
+    renderQso();
+});
+
+async function fillOutputList() {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const outputs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput' && d.deviceId !== 'default');
+    const select = $('tx-output');
+    const saved = store.get('txOutput');
+    select.replaceChildren(new Option('Default output', ''), ...outputs.map((d, i) => new Option(d.label || `Output ${i + 1}`, d.deviceId, false, d.deviceId === saved)));
+    if (!transmitter.context?.setSinkId && !('setSinkId' in AudioContext.prototype)) select.disabled = true;
+}
+$('tx-output').addEventListener('change', async (e) => {
+    store.set('txOutput', e.target.value);
+    try { await transmitter.setOutputDevice(e.target.value); } catch (err) { showError(`Could not use that output: ${err.message}`); }
+});
+transmitter.outputDeviceId = store.get('txOutput');
+fillOutputList();
+
+$('tx-enable').addEventListener('change', async (e) => {
+    if (e.target.checked && !qso.blocker() && !(source && sourceKind === 'test')) {
+        try { await transmitter.ensureAudio(); } catch (err) { showError(`Audio output failed: ${err.message}`); }
+    }
+    qso.setEnabled(e.target.checked);
+    e.target.checked = qso.enabled;
+    renderQso();
+});
+$('call-cq').addEventListener('click', () => {
+    qso.callCq({ even: $('tx-parity').value === 'even' });
+});
+function answerSelected() {
+    if (!selectedDecode) return;
+    if (!qso.answer(selectedDecode)) showError(`Can't answer "${selectedDecode.text}": no plain callsign to reply to.`);
+}
+$('answer').addEventListener('click', answerSelected);
+$('stop-qso').addEventListener('click', () => qso.stopQso());
+document.querySelectorAll('[data-halt]').forEach((b) => b.addEventListener('click', () => { qso.halt(); $('tx-enable').checked = false; }));
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && (transmitter.current || qso.enabled)) { qso.halt(); $('tx-enable').checked = false; }
+});
+window.addEventListener('pagehide', () => qso.halt());
+qso.addEventListener('change', renderQso);
+qso.addEventListener('logged', (e) => addLogRow(e.detail));
+
+const STATE_TEXT = {
+    [STATE.IDLE]: () => 'Not in a QSO',
+    [STATE.CQ]: () => 'Calling CQ, waiting for a reply',
+    [STATE.CALLING]: (s) => `Calling ${s.dxCall}, waiting for a report`,
+    [STATE.REPORT_SENT]: (s) => `In QSO with ${s.dxCall} · report ${s.sentReport} sent, waiting for theirs`,
+    [STATE.ROGER_SENT]: (s) => `In QSO with ${s.dxCall} · report ${s.rcvdReport} received`,
+    [STATE.SIGNING_OFF]: (s) => `In QSO with ${s.dxCall} · signing off`,
+    [STATE.DONE]: (s) => `QSO with ${s.dxCall} complete and logged`,
+};
+
+function renderQso() {
+    const seq = qso.seq;
+    let state = STATE_TEXT[qso.state](seq ?? {});
+    if (seq?.gaveUp) state = seq.dxCall ? `No reply from ${seq.dxCall}; stopped calling` : 'No reply to CQ; stopped calling';
+    if (qso.next && !qso.enabled) state += ' · transmit is off';
+    $('qso-state').textContent = state;
+
+    const blocker = qso.blocker();
+    $('tx-blocker').textContent = blocker ?? (qso.enabled || !qso.next ? '' : 'Tick Enable transmit to send the next message.');
+    $('tx-enable').checked = qso.enabled;
+    $('call-cq').disabled = !!blocker;
+    const answerBtn = $('answer');
+    const dx = selectedDecode ? parseMessageParts(selectedDecode.bits, selectedDecode.text)?.from?.text : null;
+    answerBtn.hidden = !selectedDecode;
+    answerBtn.textContent = dx ? `Answer ${dx.replace(/[<>]/g, '')}` : 'Answer';
+    answerBtn.disabled = !!blocker;
+    $('stop-qso').hidden = !seq || qso.state === STATE.IDLE || qso.state === STATE.DONE;
+    if (seq?.txEven != null) $('tx-parity').value = seq.txEven ? 'even' : 'odd';
+
+    // The six messages, with the next one marked.
+    const list = $('tx-messages');
+    const msgs = seq?.messages() ?? null;
+    list.hidden = !msgs;
+    if (msgs) {
+        const next = qso.next?.key;
+        const sending = transmitter.current?.key;
+        list.replaceChildren(...['tx1', 'tx2', 'tx3', 'tx4', 'tx5', 'tx6'].map((key) => {
+            const li = document.createElement('li');
+            li.className = [key === next ? 'next' : '', key === sending ? 'sending' : ''].join(' ').trim();
+            li.innerHTML = `<span class="tx-key">${key.replace('tx', 'Tx')}</span><span></span>`;
+            li.lastChild.textContent = msgs[key];
+            li.title = 'Send this message next';
+            li.addEventListener('click', () => qso.choose(key));
+            return li;
+        }));
+    }
+
+    $('tx-help').textContent = (source && sourceKind === 'test')
+        ? `Test mode: transmissions aren't played; the simulated band hears them. ${PARTNER.call} calls CQ and answers CQs.`
+        : 'Transmit audio goes to the audio output chosen above. Key the radio with VOX for now (a QMX in Digi mode keys itself from USB audio). Transmitting needs an amateur radio licence.';
+    renderBanner();
+}
+
+function renderBanner() {
+    const tx = transmitter.current;
+    const now = clock.now();
+    const on = tx && now >= tx.slotStart;
+    $('tx-banner').hidden = !on;
+    if (on) {
+        const left = Math.max(0, (tx.audioEnd - now) / 1000);
+        $('tx-banner-text').textContent = `${tx.sent} · ${tx.freqHz} Hz · ${left.toFixed(0)} s left`;
+    }
+}
+
+function addLogRow(c) {
+    const tr = document.createElement('tr');
+    const freq = sourceKind === 'rtlsdr' && source ? `${(source.dialHz / 1e6).toFixed(3)} MHz` : '';
+    for (const v of [utcTime(c.time), c.dxCall, c.dxGrid ?? '', c.sentReport ?? '', c.rcvdReport ?? '', freq]) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+    }
+    $('log-rows').prepend(tr);
+    $('log-empty').hidden = true;
+}
+
 function updateControls() {
     const kind = selectedSource();
     $('source-help').textContent = help[kind];
@@ -242,6 +398,8 @@ function updateControls() {
         toggle.textContent = source ? 'Stop receiving' : 'Start receiving';
     }
     $('level-wrap').hidden = !source;
+    transmitter.useSoundCard = !(source && sourceKind === 'test');
+    renderQso();
     if (lastError) setState(lastError, 'error');
     else if (source && sourceKind === 'test') setState('Receiving test signals', 'running');
     else if (source && sourceKind === 'rtlsdr') {
@@ -274,10 +432,10 @@ function tick() {
         $('level-db').textContent = levelText;
     }
 }
-setInterval(tick, 100);
+setInterval(() => { tick(); qso.tick(); renderBanner(); }, 100);
 tick();
 updateControls();
 pipeline.start().catch((err) => showError(`Decoder failed to load: ${err.message}. Reload the page to try again.`));
 
 // For debugging from the browser console.
-window.qso = { clock, pipeline, waterfall, bandActivity };
+window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso };

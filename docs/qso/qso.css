@@ -140,3 +140,33 @@ button:disabled { opacity: 0.5; cursor: default; }
     .band-activity th, .band-activity td { padding: 3px 5px; }
     .source label { padding: 8px 10px; }
 }
+
+/* Transmit */
+.tx-banner {
+    flex-basis: 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #b42318; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 16px;
+}
+.tx-banner strong { text-transform: uppercase; letter-spacing: 0.05em; }
+button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weight: 700; }
+.tx-banner button.halt { background: #fff; color: #b42318; border-color: #fff; }
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+.columns > section { margin-bottom: 12px; }
+@media (max-width: 900px) { .columns { grid-template-columns: 1fr; } .columns .qso { order: -1; } }
+.qso-state { font-weight: 600; margin: 0 0 8px; }
+.qso-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.tx-messages { list-style: none; margin: 0 0 10px; padding: 0; border: 1px solid var(--line); border-radius: 6px; }
+.tx-messages li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; cursor: pointer; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.tx-messages li + li { border-top: 1px solid var(--line); }
+.tx-messages li .tx-key { color: var(--muted); font: 600 12px system-ui, sans-serif; width: 2.4em; }
+.tx-messages li.next { background: var(--to-me-bg); }
+.tx-messages li.next::after { content: "Next"; margin-left: auto; font: 600 11px system-ui, sans-serif; padding: 1px 6px; border-radius: 9px; background: var(--to-me-edge); color: #000; }
+.tx-messages li.sending::after { content: "Sending"; background: #b42318; color: #fff; }
+.tx-settings { display: grid; gap: 8px; }
+.tx-settings label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.tx-settings label.tx-enable { justify-content: flex-start; font-weight: 600; font-size: 15px; }
+.tx-settings input[type="number"] { width: 6em; }
+.tx-blocker { margin: 0; color: #b42318; font-size: 13px; }
+.tx-blocker:empty { display: none; }
+.band-activity tbody tr.ba-selected td { outline: 2px solid var(--accent); outline-offset: -2px; }
+.log table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.log th, .log td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); }

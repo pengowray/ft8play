@@ -62,6 +62,7 @@ export class Waterfall {
         this.marks = [];       // slot starts: { row, label, key }
         this.labels = new Map(); // slot key -> decodes [{ freqHz, dt, text }]
         this.highlightHz = null;
+        this.txHz = null;      // my transmit frequency, marked at the top
         this.hover = null;     // { x, y } in CSS pixels
 
         // View: frequency range, and time as the row index at the top plus rows shown.
@@ -140,6 +141,12 @@ export class Waterfall {
         this.labels.set(key, decodes.map(d => ({ freqHz: d.freqHz, dt: d.dt, text: d.text })));
         const keep = new Set(this.marks.map(m => m.key));
         for (const k of this.labels.keys()) if (!keep.has(k)) this.labels.delete(k);
+        this.queueRender();
+    }
+
+    /** Marks my transmit frequency (null to hide). */
+    setTxFreq(hz) {
+        this.txHz = hz;
         this.queueRender();
     }
 
@@ -326,16 +333,20 @@ export class Waterfall {
             }
         }
 
-        // Decoded messages, labelled at the top (latest) end of each signal's trace.
+        // Decoded messages, labelled at the top (latest) end of each signal's trace. Labels that
+        // would overlap the one to their left are moved down a line.
         for (const m of this.marks) {
             const decodes = this.labels.get(m.key);
             if (!decodes) continue;
-            for (const d of decodes) {
+            const placed = []; // { x0, x1, y }
+            for (const d of [...decodes].sort((a, b) => a.freqHz - b.freqHz)) {
                 const startRow = m.row + Math.round((0.5 + d.dt) / 0.16);
-                const y = this.rowToY(startRow + 79);
+                let y = this.rowToY(startRow + 79);
                 const x = this.hzToX(d.freqHz);
-                if (y < 14 || y > h || x < -200 || x > w) continue;
                 const tw = ctx.measureText(d.text).width;
+                while (placed.some(p => p.x1 > x - 1 && p.x0 < x + tw + 4 && Math.abs(p.y - y) < 14)) y += 14;
+                placed.push({ x0: x - 1, x1: x + tw + 4, y });
+                if (y < 14 || y > h || x < -200 || x > w) continue;
                 ctx.fillStyle = 'rgba(0,0,0,0.6)';
                 ctx.fillRect(x - 1, y - 14, tw + 5, 14);
                 ctx.fillStyle = '#ffffff';
@@ -349,6 +360,13 @@ export class Waterfall {
             ctx.strokeStyle = 'rgba(255,255,255,0.9)';
             ctx.lineWidth = 2;
             ctx.strokeRect(x0, 1, Math.max(4, x1 - x0), h - 2);
+        }
+
+        // My transmit frequency: a red bar along the top edge, 50 Hz wide (8 tones).
+        if (this.txHz != null) {
+            const x0 = this.hzToX(this.txHz), x1 = this.hzToX(this.txHz + 50);
+            ctx.fillStyle = '#e5484d';
+            ctx.fillRect(x0, 0, Math.max(3, x1 - x0), 5);
         }
 
         // Pointer line.

@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FT8 QSO (receive)</title>
+    <title>FT8 QSO</title>
     <link href="qso.css" rel="stylesheet">
 </head>
 <body>
 <header class="top">
     <div class="title">
         <h1>FT8 QSO</h1>
-        <span class="stage">Receive only · work in progress</span>
+        <span class="stage">Work in progress</span>
         <a class="back" href="../">FT8 Player</a>
     </div>
     <div class="clock" aria-live="off">
@@ -23,6 +23,10 @@
             <span id="slot-label" class="slot-label" title="Even slots start at :00 and :30 past the minute, odd slots at :15 and :45."></span>
         </div>
         <span id="clock-offset" class="clock-offset"></span>
+    </div>
+    <div id="tx-banner" class="tx-banner" role="status" hidden>
+        <strong>Transmitting</strong> <span id="tx-banner-text"></span>
+        <button type="button" class="halt" data-halt>Halt TX</button>
     </div>
 </header>
 
@@ -70,6 +74,7 @@
         <p class="help">Scroll or pinch to zoom frequency, Alt+scroll to zoom time. Drag to move along the frequency axis or back to earlier slots. Double-click to show everything.</p>
     </section>
 
+    <div class="columns">
     <section class="band-activity" aria-labelledby="ba-heading">
         <h2 id="ba-heading">Band activity</h2>
         <p class="caption">dB: signal-to-noise ratio (approximate). DT: time offset of the signal in seconds, positive means late. Freq: audio frequency of the signal's lowest tone, in Hz.</p>
@@ -85,15 +90,50 @@
             </thead>
         </table>
         <p class="ba-empty">No messages decoded yet. Messages appear at the end of each 15 s slot.</p>
+        <p class="help">Click a message to select its station; double-click to answer it.</p>
+    </section>
+
+    <section class="qso" aria-labelledby="qso-heading">
+        <h2 id="qso-heading">Transmit</h2>
+        <p id="qso-state" class="qso-state">Not in a QSO</p>
+        <div class="qso-actions">
+            <button type="button" id="call-cq">Call CQ</button>
+            <button type="button" id="answer" hidden></button>
+            <button type="button" id="stop-qso" hidden>Stop QSO</button>
+            <button type="button" class="halt" data-halt>Halt TX</button>
+        </div>
+        <ol id="tx-messages" class="tx-messages" aria-label="Messages for this QSO"></ol>
+        <div class="tx-settings">
+            <label class="tx-enable"><input type="checkbox" id="tx-enable"> Enable transmit</label>
+            <p id="tx-blocker" class="tx-blocker"></p>
+            <label>TX frequency <span><input type="number" id="tx-freq" min="200" max="2950" step="10" value="1500"> Hz</span></label>
+            <label>Transmit in <select id="tx-parity">
+                <option value="even">Even slots (:00, :30)</option>
+                <option value="odd">Odd slots (:15, :45)</option>
+            </select></label>
+            <label>Audio output <select id="tx-output"><option value="">Default output</option></select></label>
+            <label>Output level <input type="range" id="tx-level" min="0" max="1" step="0.05" value="0.5"></label>
+        </div>
+        <p id="tx-help" class="help"></p>
+    </section>
+    </div>
+
+    <section class="log" aria-labelledby="log-heading">
+        <h2 id="log-heading">Log</h2>
+        <table>
+            <thead><tr><th scope="col">UTC</th><th scope="col">Call</th><th scope="col">Grid</th><th scope="col">Sent</th><th scope="col">Rcvd</th><th scope="col">Frequency</th></tr></thead>
+            <tbody id="log-rows"></tbody>
+        </table>
+        <p id="log-empty" class="help">No QSOs yet. Completed QSOs are listed here (kept until the page is closed).</p>
     </section>
 
     <details class="station">
         <summary>My station</summary>
         <div class="station-fields">
             <label>My call <input id="my-call" autocomplete="off" spellcheck="false" placeholder="e.g. K1ABC"></label>
-            <label hidden>My grid <input id="my-grid" autocomplete="off" spellcheck="false" placeholder="e.g. QF22"></label>
+            <label>My grid <input id="my-grid" autocomplete="off" spellcheck="false" placeholder="e.g. FN42"></label>
         </div>
-        <p class="help">Messages to your callsign are marked "To you". Your call is saved in this browser only.</p>
+        <p class="help">Messages to your callsign are marked "To you". Your call and grid are saved in this browser only.</p>
     </details>
 </main>
 

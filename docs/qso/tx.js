@@ -17,7 +17,8 @@ import { wsjtxEncode } from '../wsjtx/wsjtx_engine.js';
 import { bitsToTones, genFt8Wave } from './ft8_wave.js';
 import { txDurationSeconds } from './modes.js';
 
-const PTT_TAIL_MS = 100; // keep PTT on this long after the audio ends
+const PTT_TAIL_MS = 100;        // keep PTT on this long after the audio ends
+const LATE_START_MARGIN_MS = 150; // time needed to start audio when starting late
 
 export class Transmitter extends EventTarget {
     /**
@@ -91,7 +92,9 @@ export class Transmitter extends EventTarget {
     async schedule(prepared, { slot, freqHz }) {
         if (this.current) throw new Error('Already transmitting');
         const slotStart = this.clock.slotStart(slot);
-        const audioStart = slotStart + this.mode.txStartSeconds * 1000;
+        // Normally 0.5 s into the slot. A late start (decided just after the slot began) starts
+        // as soon as possible; receivers accept signals up to about 2.5 s late.
+        const audioStart = Math.max(slotStart + this.mode.txStartSeconds * 1000, this.clock.now() + LATE_START_MARGIN_MS);
         const audioEnd = audioStart + txDurationSeconds(this.mode) * 1000;
         const tx = { ...prepared, slot, freqHz, slotStart, audioStart, audioEnd, halted: false, nodes: [] };
         this.current = tx;

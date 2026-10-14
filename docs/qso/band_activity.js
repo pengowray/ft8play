@@ -14,11 +14,14 @@ export class BandActivity {
      * @param {HTMLElement} root element containing a <tbody>-less <table> and an .ba-empty element
      * @param {{onHover?: (decode: object|null) => void}} options
      */
-    constructor(root, { onHover = () => {} } = {}) {
+    constructor(root, { onHover = () => {}, onSelect = () => {}, onPick = () => {} } = {}) {
         this.root = root;
         this.table = root.querySelector('table');
         this.empty = root.querySelector('.ba-empty');
         this.onHover = onHover;
+        this.onSelect = onSelect; // click: select a decode
+        this.onPick = onPick;     // double-click or Enter: answer it
+        this.selectedRow = null;
         this.myCall = '';
         this.slots = []; // newest first: { key, title, decodes, tbody }
     }
@@ -93,8 +96,13 @@ export class BandActivity {
                 }
                 tr.appendChild(td);
             });
+            d.slot = s.key;
+            tr.tabIndex = 0;
             tr.addEventListener('mouseenter', () => this.onHover(d));
             tr.addEventListener('mouseleave', () => this.onHover(null));
+            tr.addEventListener('click', () => this.select(tr, d));
+            tr.addEventListener('dblclick', () => this.onPick(d));
+            tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.onPick(d); });
             rows.push(tr);
         }
         if (s.decodes.length === 0) {
@@ -107,6 +115,13 @@ export class BandActivity {
             rows.push(tr);
         }
         s.tbody.replaceChildren(...rows);
+    }
+
+    select(tr, d) {
+        this.selectedRow?.classList.remove('ba-selected');
+        this.selectedRow = tr;
+        tr.classList.add('ba-selected');
+        this.onSelect(d);
     }
 
     clear() {

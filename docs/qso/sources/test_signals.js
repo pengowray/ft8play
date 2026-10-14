@@ -5,6 +5,10 @@
 
 import { PackJT77, fmtmsg, genft8Message } from '../../wsjtx/packjt77.js';
 import { bitsToTones, genFt8Wave } from '../ft8_wave.js';
+import { Sequencer, STATE } from '../sequencer.js';
+
+// A simulated station that calls CQ and answers you, so whole QSOs can be tried here.
+export const PARTNER = { call: 'WA9XYZ', grid: 'EN52', freqHz: 1250 };
 
 // Two QSOs in progress plus some CQs. Even and odd slots carry different stations, as on air.
 // Example callsigns in the style of the WSJT-X documentation.
@@ -38,6 +42,51 @@ export class TestSignalSource {
         this.sentUntil = null;      // corrected time (ms) up to which audio has been sent
         this.seed = 12345;
         this.level = -Infinity;     // peak level of the last chunk, dBFS
+        this.transmissions = [];    // my transmissions, heard back: { slot, tones, freqHz, sent, c77 }
+        this.partner = new Sequencer({ myCall: PARTNER.call, myGrid: PARTNER.grid, maxRepeats: 6 });
+        this.partner.callCq({ even: false });
+        this.partnerIdleSlots = 0;
+    }
+
+    /** Hear a transmission from this page (see Transmitter.addLoopback). */
+    hear(tx) {
+        this.transmissions.push({ slot: tx.slot, tones: tx.tones, freqHz: tx.freqHz, sent: tx.sent, c77: tx.c77, tx });
+        // If the slot's audio is already made, add it now.
+        const audio = this.slotAudio.get(tx.slot);
+        if (audio) this.mixTransmission(audio, this.transmissions.at(-1));
+    }
+
+    mixTransmission(audio, t) {
+        if (t.tx?.halted) return;
+        const noisePower2500 = this.noiseSigma ** 2 * 2500 / (this.sampleRate / 2);
+        const amplitude = Math.sqrt(2 * noisePower2500 * Math.pow(10, 5 / 10)); // heard at +5 dB
+        const wave = genFt8Wave(t.tones, { sampleRate: this.sampleRate, f0: t.freqHz, amplitude });
+        const offsetMs = t.tx ? t.tx.audioStart - t.tx.slotStart : this.clock.mode.txStartSeconds * 1000;
+        const start = Math.round(offsetMs / 1000 * this.sampleRate);
+        for (let k = 0; k < wave.length && start + k < audio.length; k++) audio[start + k] += wave[k];
+    }
+
+    /** The partner reacts to what it heard in the previous slot, then may transmit in this one. */
+    partnerMessage(slot) {
+        const p = this.partner;
+        for (const t of this.transmissions.filter(t => t.slot === slot - 1 && !t.tx?.halted)) {
+            const d = { text: t.sent, bits: t.c77, snr: -9 + Math.round(this.random() * 6) };
+            if (p.state === STATE.CQ && !p.dxCall && d.text.startsWith('CQ ')) {
+                p.answer(d, { slotEven: this.clock.isEvenSlot(slot - 1) }); // answer a CQ heard
+            } else {
+                p.onDecodes([d]);
+            }
+        }
+        this.transmissions = this.transmissions.filter(t => t.slot >= slot - 1);
+        if (p.state === STATE.DONE || p.state === STATE.IDLE) {
+            // Rest for two slots after a QSO (or after giving up), then call CQ again.
+            if (++this.partnerIdleSlots >= 2) { p.callCq({ even: false }); this.partnerIdleSlots = 0; }
+            return null;
+        }
+        const next = p.next;
+        if (!next || p.txEven !== this.clock.isEvenSlot(slot)) return null;
+        p.afterTransmit(next.key);
+        return next.text;
     }
 
     get running() {
@@ -98,20 +147,22 @@ export class TestSignalSource {
 
         const parity = this.clock.isEvenSlot(slot) ? 'even' : 'odd';
         const step = Math.floor(slot / 2) % 4;
-        SCRIPT[parity].forEach((lines, i) => {
-            const text = lines[step];
+        const lines = SCRIPT[parity].map((l, i) => ({ text: l[step], freqHz: FREQS[parity][i], snrDb: -22 + this.random() * 30 }));
+        const partnerText = this.partnerMessage(slot);
+        if (partnerText) lines.push({ text: partnerText, freqHz: PARTNER.freqHz, snrDb: -6 + this.random() * 6 });
+        lines.forEach(({ text, freqHz, snrDb }) => {
             const r = genft8Message(this.packer, fmtmsg(text.padEnd(37)));
             if (!r.success) return;
-            const snrDb = -22 + this.random() * 30;
             const dt = -0.3 + this.random() * 0.8;
             const amplitude = Math.sqrt(2 * noisePower2500 * Math.pow(10, snrDb / 10));
-            const wave = genFt8Wave(bitsToTones(r.c77), { sampleRate: this.sampleRate, f0: FREQS[parity][i], amplitude });
+            const wave = genFt8Wave(bitsToTones(r.c77), { sampleRate: this.sampleRate, f0: freqHz, amplitude });
             const start = Math.round((this.clock.mode.txStartSeconds + dt) * this.sampleRate);
             for (let k = 0; k < wave.length; k++) {
                 const j = start + k;
                 if (j >= 0 && j < n) audio[j] += wave[k];
             }
         });
+        for (const t of this.transmissions.filter(t => t.slot === slot)) this.mixTransmission(audio, t);
         this.slotAudio.set(slot, audio);
         return audio;
     }
