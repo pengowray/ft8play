@@ -11,7 +11,7 @@ import { BandActivity, utcTime } from './band_activity.js';
 import { Transmitter } from './tx.js';
 import { QsoController } from './qso_controller.js';
 import { RadioControl } from './radio/radio_control.js';
-import { $, store } from './ui/dom.js';
+import { $, store, formatMHz } from './ui/dom.js';
 import { ReceivePanel } from './ui/receive_panel.js';
 import { RadioPanel, connectPtt } from './ui/radio_panel.js';
 import { TransmitPanel } from './ui/transmit_panel.js';
@@ -80,14 +80,24 @@ pipeline.addEventListener('decodes', (e) => {
 pipeline.addEventListener('error', (e) => onError(`Decoder error: ${e.detail.message}`));
 
 // In test mode, transmissions go to the simulated band instead of the sound card.
+// Entering or leaving test mode halts transmitting, so a QSO with the simulated station
+// can't carry on over the air (or the other way round).
+let wasTestMode = false;
 receive.addEventListener('change', () => {
+    if (receive.testMode !== wasTestMode) {
+        wasTestMode = receive.testMode;
+        transmit.halt();
+    }
     transmitter.useSoundCard = !receive.testMode;
     transmit.render();
 });
 transmitter.addLoopback((tx) => { if (receive.testMode) receive.source.hear(tx); });
 
 // ---- Log ----
-qso.addEventListener('logged', (e) => log.add(e.detail, radio.frequency ?? receive.dialHz));
+qso.addEventListener('logged', (e) => {
+    const dial = radio.frequency ?? receive.dialHz;
+    log.add(e.detail, receive.testMode ? 'test mode' : dial ? formatMHz(dial) : 'unknown');
+});
 
 // ---- Clock, level meter, transmit timing: about 10 times a second ----
 setInterval(() => {

@@ -100,11 +100,16 @@ export class TransmitPanel {
         $('call-cq').addEventListener('click', () => qso.callCq({ even: $('tx-parity').value === 'even' }));
         $('answer').addEventListener('click', () => this.answerSelected());
         $('stop-qso').addEventListener('click', () => qso.stopQso());
-        const halt = () => { qso.halt(); $('tx-enable').checked = false; };
-        document.querySelectorAll('[data-halt]').forEach((b) => b.addEventListener('click', halt));
+        document.querySelectorAll('[data-halt]').forEach((b) => b.addEventListener('click', () => this.halt()));
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && (transmitter.current || qso.enabled)) halt();
+            if (e.key === 'Escape' && (transmitter.current || qso.enabled)) this.halt();
         });
+    }
+
+    /** Stops any transmission now and turns Enable transmit off. */
+    halt() {
+        this.qso.halt();
+        $('tx-enable').checked = false;
     }
 
     /** A decoded message chosen in Band activity (null to clear). */
