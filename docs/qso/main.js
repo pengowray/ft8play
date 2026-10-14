@@ -15,6 +15,7 @@ import { QsoController } from './qso_controller.js';
 import { STATE } from './sequencer.js';
 import { PARTNER } from './sources/test_signals.js';
 import { parseMessageParts } from '../ft8_parts.js';
+import { RadioControl } from './radio/radio_control.js';
 
 // ?fake-rtlsdr replaces the RTL-SDR with a simulated one (for testing without hardware).
 const fakeRtl = new URLSearchParams(location.search).has('fake-rtlsdr');
@@ -242,6 +243,62 @@ function setState(text, cls = '') {
     el.className = `rx-state ${cls}`;
 }
 
+// ---- Radio control ----
+// ?fake-radio uses a simulated QMX on a pretend serial port.
+const radio = new RadioControl({ fake: new URLSearchParams(location.search).has('fake-radio') });
+const radioMethod = $('radio-method');
+radioMethod.value = store.get('radioMethod', 'vox');
+$('radio-baud').value = store.get('radioBaud', '115200');
+$('radio-band').replaceChildren(new Option('Choose a band', ''), ...FT8_DIAL_FREQUENCIES.map(({ band, hz }) => new Option(`${band} · ${(hz / 1e6).toFixed(3)} MHz`, hz)));
+radioMethod.addEventListener('change', () => { store.set('radioMethod', radioMethod.value); renderRadio(); });
+$('radio-baud').addEventListener('change', (e) => store.set('radioBaud', e.target.value));
+$('radio-connect').addEventListener('click', async () => {
+    try {
+        await radio.connect(radioMethod.value, { baudRate: Number($('radio-baud').value) });
+    } catch (err) {
+        showError(`Radio: ${err.message}`);
+    }
+});
+$('radio-disconnect').addEventListener('click', () => radio.disconnect());
+$('radio-band').addEventListener('change', async (e) => {
+    if (!e.target.value) return;
+    try { await radio.setFrequency(Number(e.target.value)); } catch (err) { showError(`Radio: ${err.message}`); }
+});
+radio.addEventListener('change', renderRadio);
+setInterval(() => radio.refresh(), 2000);
+
+function renderRadio() {
+    const method = radioMethod.value;
+    const usesPort = method !== 'vox';
+    const connected = !!radio.link;
+    $('radio-connect').hidden = !usesPort || connected;
+    $('radio-connect').disabled = !RadioControl.available && !radio.fake;
+    $('radio-disconnect').hidden = !connected;
+    $('radio-baud').parentElement.hidden = !usesPort;
+    $('radio-cat-fields').hidden = !(connected && radio.radio);
+    const f = radio.frequency;
+    $('radio-freq').textContent = f ? `Dial ${(f / 1e6).toFixed(6)} MHz` : '';
+    if (f) $('radio-band').value = FT8_DIAL_FREQUENCIES.some(b => b.hz === f) ? f : '';
+    $('radio-summary').textContent = method === 'vox' ? 'none (VOX)'
+        : connected ? `${radio.label}${f ? ` · ${(f / 1e6).toFixed(3)} MHz` : ''}`
+        : 'not connected';
+    let help = '';
+    if (!RadioControl.available && !radio.fake && usesPort) help = 'This browser has no Web Serial. Use Chrome or Edge on a computer (or Chrome 148 or later on Android).';
+    else if (method === 'vox') help = 'The page plays the transmit audio; the radio must switch to transmit by itself. A QMX in Digi mode does this from USB audio.';
+    else if (method === 'cat') help = 'Pick the radio\'s serial port (a QMX shows up to three; use the first). The page sets the radio to Digi mode (QMX) or USB, keys it with TX; and RX;, and can change its frequency.';
+    else help = `Keys PTT by turning on the serial port's ${method.toUpperCase()} line while transmitting.`;
+    $('radio-help').textContent = radio.error ? `${radio.error} ${help}` : help;
+}
+renderRadio();
+
+// PTT follows the transmitter. If the radio can't be reached, stop transmitting.
+transmitter.addEventListener('ptton', async () => {
+    try { await radio.ptt(true); } catch (err) { qso.halt(); showError(`PTT failed, transmit stopped: ${err.message}`); }
+});
+transmitter.addEventListener('pttoff', async () => {
+    try { await radio.ptt(false); } catch (err) { showError(`Could not unkey the radio: ${err.message}. Check the radio.`); }
+});
+
 // ---- Transmit ----
 transmitter.addLoopback((tx) => { if (sourceKind === 'test') source.hear(tx); });
 
@@ -304,7 +361,7 @@ document.querySelectorAll('[data-halt]').forEach((b) => b.addEventListener('clic
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && (transmitter.current || qso.enabled)) { qso.halt(); $('tx-enable').checked = false; }
 });
-window.addEventListener('pagehide', () => qso.halt());
+window.addEventListener('pagehide', () => { qso.halt(); radio.ptt(false).catch(() => {}); });
 qso.addEventListener('change', renderQso);
 qso.addEventListener('logged', (e) => addLogRow(e.detail));
 
@@ -357,7 +414,7 @@ function renderQso() {
 
     $('tx-help').textContent = (source && sourceKind === 'test')
         ? `Test mode: transmissions aren't played; the simulated band hears them. ${PARTNER.call} calls CQ and answers CQs.`
-        : 'Transmit audio goes to the audio output chosen above. Key the radio with VOX for now (a QMX in Digi mode keys itself from USB audio). Transmitting needs an amateur radio licence.';
+        : `Transmit audio goes to the audio output chosen above. PTT: ${radio.method === 'vox' ? 'the radio\'s VOX (see Radio control)' : radio.label}. Transmitting needs an amateur radio licence.`;
     renderBanner();
 }
 
@@ -374,7 +431,8 @@ function renderBanner() {
 
 function addLogRow(c) {
     const tr = document.createElement('tr');
-    const freq = sourceKind === 'rtlsdr' && source ? `${(source.dialHz / 1e6).toFixed(3)} MHz` : '';
+    const dial = radio.frequency ?? (sourceKind === 'rtlsdr' && source ? source.dialHz : null);
+    const freq = dial ? `${(dial / 1e6).toFixed(3)} MHz` : '';
     for (const v of [utcTime(c.time), c.dxCall, c.dxGrid ?? '', c.sentReport ?? '', c.rcvdReport ?? '', freq]) {
         const td = document.createElement('td');
         td.textContent = v;
@@ -438,4 +496,4 @@ updateControls();
 pipeline.start().catch((err) => showError(`Decoder failed to load: ${err.message}. Reload the page to try again.`));
 
 // For debugging from the browser console.
-window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso };
+window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso, radio };

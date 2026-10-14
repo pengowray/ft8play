@@ -57,6 +57,28 @@
         <p id="source-help" class="help"></p>
     </section>
 
+    <details class="radio" id="radio-panel">
+        <summary>Radio control: <span id="radio-summary">none (VOX)</span></summary>
+        <div class="radio-fields">
+            <label>PTT and frequency <select id="radio-method">
+                <option value="vox">None: the radio keys itself (VOX)</option>
+                <option value="cat">CAT: QMX, (tr)uSDX, Kenwood TS-480 style</option>
+                <option value="rts">RTS line (Digirig and similar)</option>
+                <option value="dtr">DTR line</option>
+            </select></label>
+            <label>Serial speed <select id="radio-baud">
+                <option>9600</option><option>19200</option><option>38400</option><option>57600</option><option selected>115200</option>
+            </select></label>
+            <button type="button" id="radio-connect">Connect</button>
+            <button type="button" id="radio-disconnect" hidden>Disconnect</button>
+        </div>
+        <div class="radio-fields" id="radio-cat-fields" hidden>
+            <label>Radio frequency <select id="radio-band"></select></label>
+            <span id="radio-freq" class="radio-freq"></span>
+        </div>
+        <p id="radio-help" class="help"></p>
+    </details>
+
     <section class="waterfall" aria-labelledby="wf-heading">
         <h2 id="wf-heading">Waterfall</h2>
         <p class="caption">Audio frequency increases from left to right. The newest row is at the top, with a new row every 0.16 s. Brighter means a stronger signal. Horizontal lines mark the start of each 15 s slot, and decoded messages are labelled on their signals.</p>

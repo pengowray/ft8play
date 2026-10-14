@@ -170,3 +170,9 @@ button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weig
 .band-activity tbody tr.ba-selected td { outline: 2px solid var(--accent); outline-offset: -2px; }
 .log table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .log th, .log td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); }
+
+/* Radio control */
+.radio summary { cursor: pointer; font-weight: 600; }
+.radio-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+.radio-fields label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.radio-freq { font-variant-numeric: tabular-nums; color: var(--muted); }
