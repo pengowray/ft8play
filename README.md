@@ -99,7 +99,7 @@ Payload/symbol input formats: (for debugging or advanced uses)
 - You have to hit generate again after adjusting any audio settings.
 
 ## To do
-- [ ] decode FT8 audio: started, receive only, at [/qso/](https://ft8play.pengowray.com/qso/) (work in progress; see [plans/qso-page.md](plans/qso-page.md))
+- [ ] decode FT8 audio and make QSOs: started at [/qso/](https://ft8play.pengowray.com/qso/) (receive from a sound card or RTL-SDR, transmit with CAT or VOX; work in progress, untested with real radios; see [plans/qso-page.md](plans/qso-page.md))
 - [ ] clean up this readme
 - [X] fully support decoding of all ft8 message types
 - [X] fully support encoding of all ft8 message types

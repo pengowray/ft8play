@@ -1,14 +1,28 @@
 # Plan: two-way FT8 page (TX and RX)
 
-Status: receiving works (steps 1 and 2 below), at `docs/qso/` (live at /qso/). Written 2026-10-13, updated 2026-10-14.
+Status: steps 1 to 5 below are built at `docs/qso/` (live at /qso/), tested here with simulated inputs only. Written 2026-10-13, updated 2026-10-14.
 
-Built so far: ft8_lib's decoder in wasm (`docs/ft8_rx.js`, checked against native ft8_lib on 69 recordings), the slot clock with DT-based correction, a JS port of `gen_ft8wave`, and the page: sound card, test-signal and audio-file inputs, waterfall, band activity.
+Built so far:
+- Receive: ft8_lib's decoder in wasm (`docs/ft8_rx.js`, checked against native ft8_lib on 69 recordings), slot clock with DT-based correction, inputs from a sound card, an RTL-SDR (WebUSB, `docs/vendor/webrtlsdr`), test signals, or an audio file; zoomable waterfall with decode labels; band activity.
+- Transmit: `gen_ft8wave` port, transmitter scheduled on the AudioContext clock, WSJT-X-style sequencer (Tx1 to Tx6), controller that books messages per slot, transmit panel and log; Enable transmit per session, Halt TX (button, banner, Escape).
+- Radio control: Web Serial with Kenwood TS-480 CAT (QMX, (tr)uSDX) or RTS/DTR PTT.
+- Test doubles: `?fake-rtlsdr` (simulated stick), `?fake-radio` (simulated QMX), and test signals with a simulated station (WA9XYZ) that completes QSOs.
+- Node tests: `node --test "tools/qso-tests/*.test.mjs"` (slot clock, waveform, IQ to audio, sequencer, CAT).
 
 Known limits:
-- The sound card input is untested with a real radio, and on Android.
-- Firefox will probably refuse the sound card input: the page asks for a 12 kHz AudioContext, and Firefox doesn't resample a microphone to a different rate (Chromium does). Fix: open the context at the device rate and decimate to 12 kHz in JS.
+- Untested with real hardware: sound card input and output, RTL-SDR, CAT and PTT. Nothing has been transmitted on air.
+- Firefox will probably refuse the sound card input: the page asks for a 12 kHz AudioContext, and Firefox doesn't resample a microphone to a different rate (Chromium does). Fix: open the context at the device rate and decimate to 12 kHz in JS. Firefox and Safari have no WebUSB or Web Serial, so no RTL-SDR or radio control there.
 - No way to set the clock offset by hand yet (the clock line can say "set manually", but nothing sets it).
 - The SNR scale matches synthetic signals; comparing with current WSJT-X on the same recording is still to do.
+- The log is lost when the page closes (no IndexedDB or ADIF export yet).
+- (tr)uSDX audio over its serial port, HackRF, and the WebUSB CH340 driver for Android are not started.
+- QMX: CAT command `TA` can set the transmitted tone directly in Digi mode. Sending FT8 that way would need no audio connection at all, which suits phones; worth trying.
+
+First real tests, in order (bench safety: transmit into a dummy load, never directly into an SDR input):
+1. RTL-SDR on 20 m or 40 m with a wire antenna: decodes should appear within two slots.
+2. QMX as the receive sound card: same, and compare decodes with WSJT-X.
+3. QMX transmit into a dummy load, with the second QMX (or the RTL-SDR, heavily attenuated) receiving: the page should decode its own signal at DT near 0.
+4. A real QSO.
 
 Goal: a second page, `docs/qso/index.html` (served at `/qso/`), that can hold a complete FT8 QSO in the browser.
 Stage 1 uses audio only: a sound card or an SDR for receive, a sound card for transmit, manual PTT or VOX.
@@ -212,9 +226,9 @@ docs/qso/radio/rigctld.js         (later)
 
 1. ~~Slot clock, sound card input and waterfall.~~ Done; check levels with a QMX.
 2. ~~ft8_lib decoder in a worker; decode recorded WAVs.~~ Done.
-3. RTL-SDR source (V4 first): decode real FT8 off-air with a wire antenna, on desktop and on an Android phone. No licence or TX antenna needed.
-4. TX: port `gen_ft8wave`, sound card sink, Kenwood CAT PTT. Bench QSO between the two QMXs into dummy loads, with the RTL-SDR (heavily attenuated) as a monitor.
-5. Sequencer with unit tests; full bench QSO, then on-air once the antenna is up.
+3. ~~RTL-SDR source.~~ Done with a simulated stick; untested with a real one. Next: decode real FT8 off-air with a wire antenna, on desktop and on an Android phone.
+4. ~~TX: port `gen_ft8wave`, sound card sink, Kenwood CAT PTT.~~ Done; untested with a radio. Next: bench QSO between the two QMXs into dummy loads.
+5. ~~Sequencer with unit tests.~~ Done (simulated QSOs complete). Next: full bench QSO, then on-air once the antenna is up.
 6. (tr)uSDX: Kenwood CAT plus serial audio.
 7. HackRF source and sink (bench only).
 8. Better decoder (MSHV port).
