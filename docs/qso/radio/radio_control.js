@@ -40,6 +40,14 @@ export class RadioControl extends EventTarget {
         return `${this.method.toUpperCase()} line on the serial port`;
     }
 
+    /** How PTT works now, for help text. */
+    get pttDescription() {
+        if (this.method === 'vox') return 'the radio\'s VOX (see Radio control)';
+        if (!this.link) return 'not connected (see Radio control)';
+        if (this.radio) return `CAT commands to the ${this.radio.model}`;
+        return `the serial port's ${this.method.toUpperCase()} line`;
+    }
+
     /** Must be called from a click: the browser shows its list of serial ports. */
     async connect(method, { baudRate = 115200, digitalMode = true } = {}) {
         await this.disconnect();
@@ -63,7 +71,7 @@ export class RadioControl extends EventTarget {
                 await this.link.setLine(method, false);
             }
         } catch (err) {
-            this.error = err.name === 'NotFoundError' ? 'No serial port was chosen.' : err.message;
+            this.error = err.name === 'NotFoundError' ? 'No serial port was chosen. Press Connect and choose the radio\'s port.' : err.message;
             await this.disconnect(true);
             throw new Error(this.error);
         } finally {

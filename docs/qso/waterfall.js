@@ -408,7 +408,7 @@ export class Waterfall {
         if (!this.readout) return;
         if (!this.hover || !this.geometry) {
             const span = `${Math.round(this.fLo)} to ${Math.round(this.fHi)} Hz`;
-            this.readout.textContent = this.live ? `${span}, latest` : `${span}, earlier`;
+            this.readout.textContent = this.live ? `${span} · latest slots` : `${span} · earlier slots`;
             return;
         }
         const hz = this.xToHz(this.hover.x);
@@ -422,7 +422,7 @@ export class Waterfall {
             const bin = Math.floor((hz - this.minFreq) / this.geometry.binHz);
             if (bin >= 0 && bin < r.data.length) {
                 const above = r.data[bin] / 2 - 120 - (r.floor - FLOOR_DB);
-                text += ` · ${above >= 0 ? '+' : '−'}${Math.abs(above).toFixed(0)} dB vs noise`;
+                text += ` · ${Math.abs(above).toFixed(0)} dB ${above >= 0 ? 'above' : 'below'} the noise floor`;
             }
         }
         this.readout.textContent = text;

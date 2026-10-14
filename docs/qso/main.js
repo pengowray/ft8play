@@ -92,8 +92,8 @@ pipeline.addEventListener('error', (e) => showError(`Decoder error: ${e.detail.m
 // ---- Source selection ----
 const help = {
     soundcard: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, for example 14.074 MHz. The browser will ask for microphone permission.',
-    rtlsdr: 'Receives with an RTL-SDR USB stick (RTL-SDR Blog V3 or V4, or another R820T/R828D stick) and an antenna, in upper sideband on the chosen FT8 frequency. Works in Chrome and Edge, including on Android. The browser asks which USB device to use.',
-    test: 'Simulated FT8 signals mixed with noise, for trying the page without a radio.',
+    rtlsdr: 'Receives from an RTL-SDR USB stick connected to an antenna, in upper sideband on the chosen FT8 frequency. HF works on an RTL-SDR Blog V3 or V4 (other sticks need a direct-sampling modification). Works in Chrome and Edge on a computer, and in Chrome on Android. When you press Start receiving, the browser asks which USB device to use.',
+    test: 'Simulated FT8 signals mixed with noise, for trying the page without a radio. A simulated station, WA9XYZ, calls CQ and answers your CQ.',
     file: 'Decodes the first 15 s of a recording. The recording must start at the beginning of a slot (:00, :15, :30 or :45 past the minute), such as a WAV file saved by WSJT-X.',
 };
 function selectedSource() {
@@ -152,7 +152,7 @@ gainSelect.addEventListener('change', async () => {
 if (!navigator.usb && !fakeRtl) {
     const radio = document.querySelector('input[name="source"][value="rtlsdr"]');
     radio.disabled = true;
-    radio.parentElement.title = 'Needs WebUSB, which this browser doesn\'t have. Use Chrome or Edge.';
+    radio.parentElement.title = 'This browser has no WebUSB. Use Chrome or Edge on a computer, or Chrome on Android.';
     radio.parentElement.classList.add('unavailable');
 }
 
@@ -214,9 +214,9 @@ async function startSource() {
         if (kind === 'soundcard' && err.name === 'NotAllowedError') {
             message = 'Microphone permission was refused. Allow it in the browser\'s site settings, then try again.';
         } else if (kind === 'rtlsdr' && err.name === 'NotFoundError') {
-            message = 'No RTL-SDR was chosen. Plug it in, press Start receiving, and pick it in the list.';
+            message = 'No RTL-SDR was chosen. Plug it in, press Start receiving, and choose it in the browser\'s list of USB devices.';
         } else if (kind === 'rtlsdr' && /claim|access|busy|SecurityError/i.test(`${err.name} ${err.message}`)) {
-            message = `Could not open the RTL-SDR: ${err.message}. Another program may be using it; on Linux, its TV driver (dvb_usb_rtl28xxu) may need unloading.`;
+            message = `Could not open the RTL-SDR: ${err.message}. Close any other program that is using it. On Windows, install the WinUSB driver for it with Zadig. On Linux, unload the TV driver (sudo rmmod dvb_usb_rtl28xxu) and allow access with a udev rule.`;
         }
         showError(message);
     }
@@ -283,20 +283,30 @@ function renderRadio() {
         : connected ? `${radio.label}${f ? ` · ${(f / 1e6).toFixed(3)} MHz` : ''}`
         : 'not connected';
     let help = '';
-    if (!RadioControl.available && !radio.fake && usesPort) help = 'This browser has no Web Serial. Use Chrome or Edge on a computer (or Chrome 148 or later on Android).';
-    else if (method === 'vox') help = 'The page plays the transmit audio; the radio must switch to transmit by itself. A QMX in Digi mode does this from USB audio.';
-    else if (method === 'cat') help = 'Pick the radio\'s serial port (a QMX shows up to three; use the first). The page sets the radio to Digi mode (QMX) or USB, keys it with TX; and RX;, and can change its frequency.';
+    if (!RadioControl.available && !radio.fake && usesPort) help = 'This browser has no Web Serial. Use Chrome or Edge on a computer, or Chrome 148 or later on Android.';
+    else if (method === 'vox') help = 'The page plays the transmit audio, and the radio\'s VOX must switch it to transmit. A QMX in Digi mode switches to transmit when audio arrives over USB.';
+    else if (method === 'cat') help = 'Choose the radio\'s serial port. A QMX has up to three serial ports; choose the first. The page sets the radio to Digi mode (QMX) or upper sideband (other radios), switches it between transmit and receive with the TX; and RX; commands, and can change its frequency.';
     else help = `Keys PTT by turning on the serial port's ${method.toUpperCase()} line while transmitting.`;
     $('radio-help').textContent = radio.error ? `${radio.error} ${help}` : help;
 }
 renderRadio();
 
 // PTT follows the transmitter. If the radio can't be reached, stop transmitting.
+// In test mode the radio is never keyed: the transmissions only go to the simulated band.
 transmitter.addEventListener('ptton', async () => {
+    if (sourceKind === 'test') return;
     try { await radio.ptt(true); } catch (err) { qso.halt(); showError(`PTT failed, transmit stopped: ${err.message}`); }
 });
 transmitter.addEventListener('pttoff', async () => {
-    try { await radio.ptt(false); } catch (err) { showError(`Could not unkey the radio: ${err.message}. Check the radio.`); }
+    if (!radio.pttOn) return;
+    try {
+        await radio.ptt(false);
+    } catch {
+        await new Promise(r => setTimeout(r, 500)); // one retry
+        try { await radio.ptt(false); } catch (err) {
+            showError(`Could not unkey the radio: ${err.message}. The radio may still be transmitting. Switch it to receive with its own controls, or turn it off.`);
+        }
+    }
 });
 
 // ---- Transmit ----
@@ -335,14 +345,19 @@ async function fillOutputList() {
 }
 $('tx-output').addEventListener('change', async (e) => {
     store.set('txOutput', e.target.value);
-    try { await transmitter.setOutputDevice(e.target.value); } catch (err) { showError(`Could not use that output: ${err.message}`); }
+    try { await transmitter.setOutputDevice(e.target.value); } catch (err) { showError(`Could not use audio output "${e.target.selectedOptions[0]?.textContent}": ${err.message}`); }
 });
 transmitter.outputDeviceId = store.get('txOutput');
 fillOutputList();
 
 $('tx-enable').addEventListener('change', async (e) => {
     if (e.target.checked && !qso.blocker() && !(source && sourceKind === 'test')) {
-        try { await transmitter.ensureAudio(); } catch (err) { showError(`Audio output failed: ${err.message}`); }
+        try {
+            await transmitter.ensureAudio();
+        } catch (err) {
+            showError(`Audio output failed, transmit not enabled: ${err.message}`);
+            e.target.checked = false;
+        }
     }
     qso.setEnabled(e.target.checked);
     e.target.checked = qso.enabled;
@@ -353,7 +368,7 @@ $('call-cq').addEventListener('click', () => {
 });
 function answerSelected() {
     if (!selectedDecode) return;
-    if (!qso.answer(selectedDecode)) showError(`Can't answer "${selectedDecode.text}": no plain callsign to reply to.`);
+    if (!qso.answer(selectedDecode)) showError(`Can't answer "${selectedDecode.text}": the sender's full callsign isn't in the message.`);
 }
 $('answer').addEventListener('click', answerSelected);
 $('stop-qso').addEventListener('click', () => qso.stopQso());
@@ -372,14 +387,19 @@ const STATE_TEXT = {
     [STATE.REPORT_SENT]: (s) => `In QSO with ${s.dxCall} · report ${s.sentReport} sent, waiting for theirs`,
     [STATE.ROGER_SENT]: (s) => `In QSO with ${s.dxCall} · report ${s.rcvdReport} received`,
     [STATE.SIGNING_OFF]: (s) => `In QSO with ${s.dxCall} · signing off`,
-    [STATE.DONE]: (s) => `QSO with ${s.dxCall} complete and logged`,
+    [STATE.DONE]: (s) => `QSO with ${s.dxCall} complete, added to the log`,
 };
 
 function renderQso() {
     const seq = qso.seq;
     let state = STATE_TEXT[qso.state](seq ?? {});
     if (seq?.gaveUp) state = seq.dxCall ? `No reply from ${seq.dxCall}; stopped calling` : 'No reply to CQ; stopped calling';
-    if (qso.next && !qso.enabled) state += ' · transmit is off';
+    if (qso.next && !qso.enabled) {
+        // Nothing is being sent, so don't say "calling".
+        if (qso.state === STATE.CQ) state = 'CQ ready to send';
+        if (qso.state === STATE.CALLING) state = `Call to ${seq.dxCall} ready to send`;
+        state += ' · Enable transmit is off';
+    }
     $('qso-state').textContent = state;
 
     const blocker = qso.blocker();
@@ -392,6 +412,7 @@ function renderQso() {
     answerBtn.textContent = dx ? `Answer ${dx.replace(/[<>]/g, '')}` : 'Answer';
     answerBtn.disabled = !!blocker;
     $('stop-qso').hidden = !seq || qso.state === STATE.IDLE || qso.state === STATE.DONE;
+    $('stop-qso').textContent = qso.state === STATE.CQ ? 'Stop CQ' : 'Stop QSO';
     if (seq?.txEven != null) $('tx-parity').value = seq.txEven ? 'even' : 'odd';
 
     // The six messages, with the next one marked.
@@ -413,8 +434,8 @@ function renderQso() {
     }
 
     $('tx-help').textContent = (source && sourceKind === 'test')
-        ? `Test mode: transmissions aren't played; the simulated band hears them. ${PARTNER.call} calls CQ and answers CQs.`
-        : `Transmit audio goes to the audio output chosen above. PTT: ${radio.method === 'vox' ? 'the radio\'s VOX (see Radio control)' : radio.label}. Transmitting needs an amateur radio licence.`;
+        ? `Test mode: no audio is played and the radio is not keyed. The simulated station ${PARTNER.call} receives your messages, calls CQ, and answers your CQ.`
+        : `Transmit audio goes to the audio output chosen above. PTT: ${radio.pttDescription}. Transmitting needs an amateur radio licence.`;
     renderBanner();
 }
 
@@ -486,7 +507,7 @@ function tick() {
         const level = Math.max(-60, Math.min(0, source.level));
         $('level').value = level;
         let levelText = Number.isFinite(source.level) ? `${source.level.toFixed(0)} dBFS` : '';
-        if (source.level > -1) levelText += sourceKind === 'rtlsdr' ? ' · overloaded, lower the gain' : ' · clipping, lower the input level';
+        if (source.level > -1) levelText += sourceKind === 'rtlsdr' ? ' · overloaded, choose a lower gain' : ' · clipping, lower the recording level';
         $('level-db').textContent = levelText;
     }
 }

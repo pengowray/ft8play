@@ -106,7 +106,7 @@ export class RtlSdrSource {
     updateLabel() {
         const d = this.device;
         const name = d?.tuner?.isRtlSdrBlogV4 ? 'RTL-SDR Blog V4' : 'RTL-SDR';
-        this.deviceLabel = d?.directSampling ? `${name}, direct sampling` : name;
+        this.deviceLabel = d?.directSampling ? `${name} (direct sampling)` : name;
     }
 
     /** Retunes while running. */

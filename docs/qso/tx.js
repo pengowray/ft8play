@@ -43,7 +43,7 @@ export class Transmitter extends EventTarget {
      */
     prepare(text) {
         const r = wsjtxEncode(text);
-        if (!r.success) throw new Error(`Can't send "${text}": WSJT-X would reject it`);
+        if (!r.success) throw new Error(`Can't send "${text}": it can't be packed into an FT8 message`);
         const sent = r.msgsent;
         const normalised = text.trim().toUpperCase().replace(/\s+/g, ' ');
         return {

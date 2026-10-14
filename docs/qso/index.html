@@ -62,7 +62,7 @@
         <div class="radio-fields">
             <label>PTT and frequency <select id="radio-method">
                 <option value="vox">None: the radio keys itself (VOX)</option>
-                <option value="cat">CAT: QMX, (tr)uSDX, Kenwood TS-480 style</option>
+                <option value="cat">CAT with Kenwood TS-480 commands: QMX, (tr)uSDX and others</option>
                 <option value="rts">RTS line (Digirig and similar)</option>
                 <option value="dtr">DTR line</option>
             </select></label>
@@ -81,19 +81,19 @@
 
     <section class="waterfall" aria-labelledby="wf-heading">
         <h2 id="wf-heading">Waterfall</h2>
-        <p class="caption">Audio frequency increases from left to right. The newest row is at the top, with a new row every 0.16 s. Brighter means a stronger signal. Horizontal lines mark the start of each 15 s slot, and decoded messages are labelled on their signals.</p>
+        <p class="caption">Audio frequency increases from left to right. The newest row is at the top, with a new row every 0.16 s. Brighter means a stronger signal. Horizontal lines mark the start of each 15 s slot. Each decoded signal is labelled with its message, and the red mark on the top edge is your transmit frequency.</p>
         <div class="wf-frame">
-            <canvas aria-label="Waterfall of received audio. Scroll to zoom frequency, drag to pan, double-click to show everything."></canvas>
+            <canvas aria-label="Waterfall of received audio. Scroll to zoom the frequency axis, drag to move, double-click to reset the view."></canvas>
         </div>
         <div class="wf-axis" aria-hidden="true"></div>
         <div class="wf-controls">
             <button type="button" data-wf="zoom-out" title="Zoom out (frequency)" aria-label="Zoom out">−</button>
             <button type="button" data-wf="zoom-in" title="Zoom in (frequency)" aria-label="Zoom in">+</button>
-            <button type="button" data-wf="reset">Show all</button>
+            <button type="button" data-wf="reset" title="Show all frequencies and the latest slots">Reset view</button>
             <button type="button" data-wf="live" class="primary" hidden>Back to latest</button>
             <span class="wf-readout" aria-live="off"></span>
         </div>
-        <p class="help">Scroll or pinch to zoom frequency, Alt+scroll to zoom time. Drag to move along the frequency axis or back to earlier slots. Double-click to show everything.</p>
+        <p class="help">Scroll or pinch to zoom the frequency axis; Alt+scroll (Option+scroll on a Mac) zooms the time axis. Drag sideways to move along the frequency axis, or drag up to see earlier slots. Double-click to reset the view.</p>
     </section>
 
     <div class="columns">
@@ -112,7 +112,7 @@
             </thead>
         </table>
         <p class="ba-empty">No messages decoded yet. Messages appear at the end of each 15 s slot.</p>
-        <p class="help">Click a message to select its station; double-click to answer it.</p>
+        <p class="help">Click or tap a message to select the station that sent it, then press Answer; or double-click it to answer that station straight away.</p>
     </section>
 
     <section class="qso" aria-labelledby="qso-heading">
@@ -121,7 +121,7 @@
         <div class="qso-actions">
             <button type="button" id="call-cq">Call CQ</button>
             <button type="button" id="answer" hidden></button>
-            <button type="button" id="stop-qso" hidden>Stop QSO</button>
+            <button type="button" id="stop-qso" title="Stops the QSO and any transmission now. Transmit stays enabled." hidden>Stop QSO</button>
             <button type="button" class="halt" data-halt>Halt TX</button>
         </div>
         <ol id="tx-messages" class="tx-messages" aria-label="Messages for this QSO"></ol>
@@ -143,10 +143,11 @@
     <section class="log" aria-labelledby="log-heading">
         <h2 id="log-heading">Log</h2>
         <table>
-            <thead><tr><th scope="col">UTC</th><th scope="col">Call</th><th scope="col">Grid</th><th scope="col">Sent</th><th scope="col">Rcvd</th><th scope="col">Frequency</th></tr></thead>
+            <thead><tr><th scope="col">UTC</th><th scope="col">Call</th><th scope="col">Grid</th><th scope="col">Sent</th><th scope="col">Rcvd</th><th scope="col">Dial frequency</th></tr></thead>
             <tbody id="log-rows"></tbody>
         </table>
-        <p id="log-empty" class="help">No QSOs yet. Completed QSOs are listed here (kept until the page is closed).</p>
+        <p id="log-empty" class="help">No QSOs yet. Completed QSOs are listed here.</p>
+        <p class="help">The log is cleared when you close or reload the page.</p>
     </section>
 
     <details class="station">

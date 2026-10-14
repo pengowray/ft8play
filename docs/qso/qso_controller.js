@@ -47,7 +47,7 @@ export class QsoController extends EventTarget {
     /** Why transmitting can't be enabled, or null if it can. */
     blocker() {
         if (!this.myCall) return 'Enter your callsign under My station.';
-        if (!/^[A-R]{2}\d{2}$/.test(this.myGrid)) return 'Enter your 4-character grid square under My station.';
+        if (!/^[A-R]{2}\d{2}([A-X]{2})?$/.test(this.myGrid)) return 'Enter your grid square (4 or 6 characters) under My station.';
         return null;
     }
 
