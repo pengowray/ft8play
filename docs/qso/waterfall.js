@@ -224,7 +224,7 @@ export class Waterfall {
         }, { passive: false });
 
         c.addEventListener('pointerdown', (e) => {
-            c.setPointerCapture(e.pointerId);
+            try { c.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
             this.pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
         });
         c.addEventListener('pointermove', (e) => {

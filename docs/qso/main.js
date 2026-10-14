@@ -8,6 +8,11 @@ import { BandActivity, utcTime } from './band_activity.js';
 import { TestSignalSource } from './sources/test_signals.js';
 import { SoundCardSource, listInputDevices } from './sources/sound_card.js';
 import { readAudioFile } from './sources/wav_file.js';
+import { RtlSdrSource, FT8_DIAL_FREQUENCIES } from './sources/rtlsdr.js';
+import { FakeRtlProvider } from './sources/fake_rtlsdr.js';
+
+// ?fake-rtlsdr replaces the RTL-SDR with a simulated one (for testing without hardware).
+const fakeRtl = new URLSearchParams(location.search).has('fake-rtlsdr');
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -62,7 +67,8 @@ pipeline.addEventListener('decodes', (e) => {
             : `Decoded ${label}`);
     }
     // Correct the clock from received signals, but not from simulated ones.
-    if (sourceKind === 'soundcard' && typeof result.slot === 'number') {
+    const realSignals = sourceKind === 'soundcard' || (sourceKind === 'rtlsdr' && !fakeRtl);
+    if (realSignals && typeof result.slot === 'number') {
         clock.addSlotDts(result.slot, result.decodes.filter(d => d.snr == null || d.snr > -18).map(d => d.dt));
     }
 });
@@ -71,6 +77,7 @@ pipeline.addEventListener('error', (e) => showError(`Decoder error: ${e.detail.m
 // ---- Source selection ----
 const help = {
     soundcard: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, for example 14.074 MHz. The browser will ask for microphone permission.',
+    rtlsdr: 'Receives with an RTL-SDR USB stick (RTL-SDR Blog V3 or V4, or another R820T/R828D stick) and an antenna, in upper sideband on the chosen FT8 frequency. Works in Chrome and Edge, including on Android. The browser asks which USB device to use.',
     test: 'Simulated FT8 signals mixed with noise, for trying the page without a radio.',
     file: 'Decodes the first 15 s of a recording. The recording must start at the beginning of a slot (:00, :15, :30 or :45 past the minute), such as a WAV file saved by WSJT-X.',
 };
@@ -98,6 +105,42 @@ async function fillDeviceList() {
         return o;
     }));
 }
+// RTL-SDR band and gain.
+const bandSelect = $('rtl-band');
+bandSelect.replaceChildren(...FT8_DIAL_FREQUENCIES.map(({ band, hz }) => {
+    const o = document.createElement('option');
+    o.value = hz;
+    o.textContent = `${band} · ${(hz / 1e6).toFixed(3)} MHz`;
+    return o;
+}));
+bandSelect.value = store.get('rtlDial', '14074000');
+bandSelect.addEventListener('change', async () => {
+    store.set('rtlDial', bandSelect.value);
+    if (sourceKind === 'rtlsdr') {
+        await source.setDial(Number(bandSelect.value));
+        updateControls();
+    }
+});
+const gainSelect = $('rtl-gain');
+gainSelect.replaceChildren(...['auto', 0, 10, 20, 30, 40, 49].map((g) => {
+    const o = document.createElement('option');
+    o.value = g;
+    o.textContent = g === 'auto' ? 'Gain: automatic' : `Gain: ${g} dB`;
+    return o;
+}));
+gainSelect.value = store.get('rtlGain', 'auto');
+const selectedGain = () => (gainSelect.value === 'auto' ? null : Number(gainSelect.value));
+gainSelect.addEventListener('change', async () => {
+    store.set('rtlGain', gainSelect.value);
+    if (sourceKind === 'rtlsdr') await source.setGain(selectedGain());
+});
+if (!navigator.usb && !fakeRtl) {
+    const radio = document.querySelector('input[name="source"][value="rtlsdr"]');
+    radio.disabled = true;
+    radio.parentElement.title = 'Needs WebUSB, which this browser doesn\'t have. Use Chrome or Edge.';
+    radio.parentElement.classList.add('unavailable');
+}
+
 $('input-device').addEventListener('change', async (e) => {
     store.set('inputDevice', e.target.value);
     if (sourceKind === 'soundcard') { await stopSource(); await startSource(); }
@@ -136,6 +179,13 @@ async function startSource() {
         if (kind === 'test') {
             source = new TestSignalSource({ clock, onAudio });
             source.start();
+        } else if (kind === 'rtlsdr') {
+            source = new RtlSdrSource({
+                clock, onAudio, dialHz: Number(bandSelect.value), gainDb: selectedGain(),
+                provider: fakeRtl ? new FakeRtlProvider({ clock }) : undefined,
+            });
+            source.onError = (err) => { showError(`RTL-SDR stopped: ${err.message}`); stopSource(); };
+            await source.start();
         } else if (kind === 'soundcard') {
             source = new SoundCardSource({ clock, onAudio, deviceId: store.get('inputDevice') || null });
             await source.start();
@@ -145,9 +195,15 @@ async function startSource() {
     } catch (err) {
         source = null;
         sourceKind = null;
-        showError(kind === 'soundcard' && err.name === 'NotAllowedError'
-            ? 'Microphone permission was refused. Allow it in the browser\'s site settings, then try again.'
-            : `Could not start receiving: ${err.message}`);
+        let message = `Could not start receiving: ${err.message}`;
+        if (kind === 'soundcard' && err.name === 'NotAllowedError') {
+            message = 'Microphone permission was refused. Allow it in the browser\'s site settings, then try again.';
+        } else if (kind === 'rtlsdr' && err.name === 'NotFoundError') {
+            message = 'No RTL-SDR was chosen. Plug it in, press Start receiving, and pick it in the list.';
+        } else if (kind === 'rtlsdr' && /claim|access|busy|SecurityError/i.test(`${err.name} ${err.message}`)) {
+            message = `Could not open the RTL-SDR: ${err.message}. Another program may be using it; on Linux, its TV driver (dvb_usb_rtl28xxu) may need unloading.`;
+        }
+        showError(message);
     }
     updateControls();
 }
@@ -176,6 +232,8 @@ function updateControls() {
     const kind = selectedSource();
     $('source-help').textContent = help[kind];
     $('input-device').hidden = kind !== 'soundcard';
+    bandSelect.hidden = kind !== 'rtlsdr';
+    gainSelect.hidden = kind !== 'rtlsdr';
     if (kind === 'soundcard' && !$('input-device').options.length) fillDeviceList();
     const toggle = $('rx-toggle');
     if (kind === 'file') {
@@ -186,6 +244,10 @@ function updateControls() {
     $('level-wrap').hidden = !source;
     if (lastError) setState(lastError, 'error');
     else if (source && sourceKind === 'test') setState('Receiving test signals', 'running');
+    else if (source && sourceKind === 'rtlsdr') {
+        const band = FT8_DIAL_FREQUENCIES.find(b => b.hz === source.dialHz);
+        setState(`Receiving from ${fakeRtl ? 'simulated ' : ''}${source.deviceLabel} on ${(source.dialHz / 1e6).toFixed(3)} MHz${band ? ` (${band.band})` : ''}`, 'running');
+    }
     else if (source) setState(`Receiving from ${source.deviceLabel || 'sound card'}`, 'running');
     else if (kind !== 'file') setState('Not receiving');
 }
@@ -207,7 +269,9 @@ function tick() {
     if (source) {
         const level = Math.max(-60, Math.min(0, source.level));
         $('level').value = level;
-        $('level-db').textContent = Number.isFinite(source.level) ? `${source.level.toFixed(0)} dBFS` : '';
+        let levelText = Number.isFinite(source.level) ? `${source.level.toFixed(0)} dBFS` : '';
+        if (source.level > -1) levelText += sourceKind === 'rtlsdr' ? ' · overloaded, lower the gain' : ' · clipping, lower the input level';
+        $('level-db').textContent = levelText;
     }
 }
 setInterval(tick, 100);

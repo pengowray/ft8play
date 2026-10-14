@@ -33,10 +33,13 @@
             <span class="source-label" id="source-label">Audio input</span>
             <div class="source" role="radiogroup" aria-labelledby="source-label">
                 <label><input type="radio" name="source" value="soundcard"> Sound card</label>
+                <label><input type="radio" name="source" value="rtlsdr"> RTL-SDR</label>
                 <label><input type="radio" name="source" value="test" checked> Test signals</label>
                 <label><input type="radio" name="source" value="file"> Audio file</label>
             </div>
             <select id="input-device" aria-label="Sound card input" hidden></select>
+            <select id="rtl-band" aria-label="Band and dial frequency" hidden></select>
+            <select id="rtl-gain" aria-label="RTL-SDR gain" hidden></select>
             <button id="rx-toggle" class="primary" type="button">Start receiving</button>
             <input id="file-input" type="file" accept=".wav,audio/*" hidden>
         </div>

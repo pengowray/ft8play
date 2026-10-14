@@ -8,7 +8,7 @@ import { bitsToTones, genFt8Wave } from '../ft8_wave.js';
 
 // Two QSOs in progress plus some CQs. Even and odd slots carry different stations, as on air.
 // Example callsigns in the style of the WSJT-X documentation.
-const SCRIPT = {
+export const SCRIPT = {
     even: [
         ['CQ K1ABC FN42', 'W9XYZ K1ABC -11', 'W9XYZ K1ABC RR73', 'CQ K1ABC FN42'],
         ['CQ DX PA9XYZ JO22', 'CQ DX PA9XYZ JO22', 'KA1ABC PA9XYZ -05', 'KA1ABC PA9XYZ RR73'],
@@ -20,7 +20,7 @@ const SCRIPT = {
         ['CQ WB9XYZ EN52', 'CQ WB9XYZ EN52', 'G4ABC WB9XYZ -17', 'G4ABC WB9XYZ RR73'],
     ],
 };
-const FREQS = { even: [800, 1450, 2100], odd: [1100, 1720, 2450] };
+export const FREQS = { even: [800, 1450, 2100], odd: [1100, 1720, 2450] };
 
 export class TestSignalSource {
     /**

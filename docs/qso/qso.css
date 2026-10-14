@@ -79,6 +79,7 @@ h2 { font-size: 15px; margin: 0 0 6px; }
 .source label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; }
 .source label + label { border-left: 1px solid var(--line); }
 .source label:has(input:checked) { background: var(--accent); color: var(--accent-text); }
+.source label.unavailable { opacity: 0.5; cursor: not-allowed; }
 /* The filled button shows the choice, so the radio circles are hidden (but still focusable). */
 .source input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .source label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: -2px; }
