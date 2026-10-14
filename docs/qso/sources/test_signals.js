@@ -7,16 +7,17 @@ import { PackJT77, fmtmsg, genft8Message } from '../../wsjtx/packjt77.js';
 import { bitsToTones, genFt8Wave } from '../ft8_wave.js';
 
 // Two QSOs in progress plus some CQs. Even and odd slots carry different stations, as on air.
+// Example callsigns in the style of the WSJT-X documentation.
 const SCRIPT = {
     even: [
         ['CQ K1ABC FN42', 'W9XYZ K1ABC -11', 'W9XYZ K1ABC RR73', 'CQ K1ABC FN42'],
-        ['CQ DX VK3PGO QF22', 'CQ DX VK3PGO QF22', 'JA1XYZ VK3PGO -05', 'JA1XYZ VK3PGO RR73'],
+        ['CQ DX PA9XYZ JO22', 'CQ DX PA9XYZ JO22', 'KA1ABC PA9XYZ -05', 'KA1ABC PA9XYZ RR73'],
         ['CQ POTA G4ABC IO91', 'CQ POTA G4ABC IO91', 'CQ POTA G4ABC IO91', 'CQ POTA G4ABC IO91'],
     ],
     odd: [
         ['K1ABC W9XYZ EN37', 'K1ABC W9XYZ R-09', 'K1ABC W9XYZ 73', 'CQ W9XYZ EN37'],
-        ['VK3PGO JA1XYZ PM95', 'VK3PGO JA1XYZ R-12', 'VK3PGO JA1XYZ 73', 'CQ JA1XYZ PM95'],
-        ['CQ PY5EJ GG54', 'CQ PY5EJ GG54', 'DL1ABC PY5EJ -17', 'DL1ABC PY5EJ RR73'],
+        ['PA9XYZ KA1ABC FN43', 'PA9XYZ KA1ABC R-12', 'PA9XYZ KA1ABC 73', 'CQ KA1ABC FN43'],
+        ['CQ WB9XYZ EN52', 'CQ WB9XYZ EN52', 'G4ABC WB9XYZ -17', 'G4ABC WB9XYZ RR73'],
     ],
 };
 const FREQS = { even: [800, 1450, 2100], odd: [1100, 1720, 2450] };

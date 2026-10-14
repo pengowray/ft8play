@@ -4,7 +4,8 @@
 //
 // Events (CustomEvent, data in .detail):
 //   'ready'   { numBins, minFreq, binHz }       waterfall geometry; bins are binHz apart
-//   'row'     { slot, block, row, minFreq, binHz }  one waterfall row (every symbol period)
+//   'row'     { slot, block, row, time, minFreq, binHz }  one waterfall row (every symbol period);
+//             time is the end of the row's block (ms), or null for recordings
 //   'slot'    { slot, start }                   a new slot started receiving
 //   'decodes' { slot, start, label, receivedSeconds, decodes: [{ text, success, freqHz, dt, snr, bits }] }
 //             receivedSeconds: seconds of audio actually received for the slot (less if receiving
@@ -138,9 +139,14 @@ export class RxPipeline extends EventTarget {
                 this.emit('ready', this.geometry);
                 this.resolveReady?.(this.geometry);
                 break;
-            case 'row':
-                this.emit('row', { slot: m.slot, block: m.block, row: m.row, minFreq: this.geometry.minFreq, binHz: this.geometry.binHz });
+            case 'row': {
+                // Time of the end of the block the row covers; recordings have no time.
+                const time = typeof m.slot === 'number'
+                    ? this.clock.slotStart(m.slot) + (m.block + 1) * this.mode.symbolSeconds * 1000
+                    : null;
+                this.emit('row', { slot: m.slot, block: m.block, row: m.row, time, minFreq: this.geometry.minFreq, binHz: this.geometry.binHz });
                 break;
+            }
             case 'decodes': {
                 const isFile = typeof m.slot === 'string';
                 const decodes = m.results.map((r) => {

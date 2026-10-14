@@ -52,12 +52,19 @@
 
     <section class="waterfall" aria-labelledby="wf-heading">
         <h2 id="wf-heading">Waterfall</h2>
-        <p class="caption">Audio frequency increases from left to right. The newest row is at the top, with a new row every 0.16 s. Brighter means a stronger signal. Horizontal lines mark the start of each 15 s slot.</p>
+        <p class="caption">Audio frequency increases from left to right. The newest row is at the top, with a new row every 0.16 s. Brighter means a stronger signal. Horizontal lines mark the start of each 15 s slot, and decoded messages are labelled on their signals.</p>
         <div class="wf-frame">
-            <canvas aria-label="Waterfall of received audio"></canvas>
-            <div class="wf-highlight" hidden></div>
+            <canvas aria-label="Waterfall of received audio. Scroll to zoom frequency, drag to pan, double-click to show everything."></canvas>
         </div>
         <div class="wf-axis" aria-hidden="true"></div>
+        <div class="wf-controls">
+            <button type="button" data-wf="zoom-out" title="Zoom out (frequency)" aria-label="Zoom out">−</button>
+            <button type="button" data-wf="zoom-in" title="Zoom in (frequency)" aria-label="Zoom in">+</button>
+            <button type="button" data-wf="reset">Show all</button>
+            <button type="button" data-wf="live" class="primary" hidden>Back to latest</button>
+            <span class="wf-readout" aria-live="off"></span>
+        </div>
+        <p class="help">Scroll or pinch to zoom frequency, Alt+scroll to zoom time. Drag to move along the frequency axis or back to earlier slots. Double-click to show everything.</p>
     </section>
 
     <section class="band-activity" aria-labelledby="ba-heading">
@@ -80,7 +87,7 @@
     <details class="station">
         <summary>My station</summary>
         <div class="station-fields">
-            <label>My call <input id="my-call" autocomplete="off" spellcheck="false" placeholder="e.g. VK3PGO"></label>
+            <label>My call <input id="my-call" autocomplete="off" spellcheck="false" placeholder="e.g. K1ABC"></label>
             <label hidden>My grid <input id="my-grid" autocomplete="off" spellcheck="false" placeholder="e.g. QF22"></label>
         </div>
         <p class="help">Messages to your callsign are marked "To you". Your call is saved in this browser only.</p>

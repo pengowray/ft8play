@@ -19,7 +19,7 @@ const clock = new SlotClock();
 const pipeline = new RxPipeline({ clock });
 const waterfall = new Waterfall(document.querySelector('.waterfall'));
 const bandActivity = new BandActivity(document.querySelector('.band-activity'), {
-    onHover: (d) => waterfall.showSignal(d ? d.freqHz : null, 50),
+    onHover: (d) => waterfall.showSignal(d ? d.freqHz : null),
 });
 
 let source = null;       // running live source
@@ -46,13 +46,14 @@ if (!myCallInput.value) document.querySelector('.station').open = true;
 // ---- Pipeline events ----
 pipeline.addEventListener('ready', (e) => waterfall.setGeometry(e.detail));
 pipeline.addEventListener('slot', (e) => {
-    const { start, label } = e.detail;
-    waterfall.markSlot(start != null ? utcTime(start) : label);
+    const { slot, start, label } = e.detail;
+    waterfall.markSlot(start != null ? utcTime(start) : label, slot);
 });
-pipeline.addEventListener('row', (e) => waterfall.addRow(e.detail.row));
+pipeline.addEventListener('row', (e) => waterfall.addRow(e.detail.row, e.detail.time));
 pipeline.addEventListener('decodes', (e) => {
     const result = e.detail;
     bandActivity.addSlot(result);
+    waterfall.addDecodes(result.slot, result.decodes);
     if (pendingFile && result.label === pendingFile.label) {
         const { label, seconds } = pendingFile;
         pendingFile = null;
@@ -213,3 +214,6 @@ setInterval(tick, 100);
 tick();
 updateControls();
 pipeline.start().catch((err) => showError(`Decoder failed to load: ${err.message}. Reload the page to try again.`));
+
+// For debugging from the browser console.
+window.qso = { clock, pipeline, waterfall, bandActivity };
