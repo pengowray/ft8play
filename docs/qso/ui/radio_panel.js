@@ -1,20 +1,21 @@
-// Radio control panel (connect over Web Serial, band, status), and PTT: keying the radio
-// when the transmitter starts and stops.
+// Radio control panel (connect over Web Serial, status), and PTT: keying the radio when the
+// transmitter starts and stops. With CAT, the radio's frequency and the page's Dial frequency
+// follow each other (see dial.js for the rules).
 
 import { RadioControl } from '../radio/radio_control.js';
-import { FT8_DIAL_FREQUENCIES } from '../bands.js';
-import { $, store, bandOptions, formatMHz } from './dom.js';
+import { $, store, formatMHz } from './dom.js';
 
 const POLL_MS = 2000; // read the radio's frequency this often (not while transmitting)
 
 export class RadioPanel {
-    /** @param {{radio: RadioControl, onError: (message: string) => void}} options */
-    constructor({ radio, onError }) {
+    /**
+     * @param {{radio: RadioControl, dial: import('../dial.js').Dial, onError: (message: string) => void}} options
+     */
+    constructor({ radio, dial, onError }) {
         this.radio = radio;
         this.method = $('radio-method');
         this.method.value = store.get('radioMethod', 'vox');
         $('radio-baud').value = store.get('radioBaud', '115200');
-        $('radio-band').replaceChildren(new Option('Choose a band', ''), ...bandOptions());
 
         this.method.addEventListener('change', () => { store.set('radioMethod', this.method.value); this.render(); });
         $('radio-baud').addEventListener('change', (e) => store.set('radioBaud', e.target.value));
@@ -26,11 +27,16 @@ export class RadioPanel {
             }
         });
         $('radio-disconnect').addEventListener('click', () => radio.disconnect());
-        $('radio-band').addEventListener('change', async (e) => {
-            if (!e.target.value) return;
-            try { await radio.setFrequency(Number(e.target.value)); } catch (err) { onError(`Radio: ${err.message}`); }
+        // The user's Dial frequency tunes the radio; the radio's own frequency becomes the dial.
+        dial.addEventListener('change', async (e) => {
+            const { hz, from } = e.detail;
+            if (from !== 'user' || !radio.radio || !hz || hz === radio.frequency) return;
+            try { await radio.setFrequency(hz); } catch (err) { onError(`Radio: ${err.message}`); }
         });
-        radio.addEventListener('change', () => this.render());
+        radio.addEventListener('change', () => {
+            if (radio.radio && radio.frequency) dial.fromRadio(radio.frequency);
+            this.render();
+        });
         setInterval(() => radio.refresh(), POLL_MS);
         this.render();
     }
@@ -47,14 +53,13 @@ export class RadioPanel {
         $('radio-cat-fields').hidden = !(connected && radio.radio);
         const f = radio.frequency;
         $('radio-freq').textContent = f ? `Dial ${formatMHz(f, 6)}` : '';
-        if (f) $('radio-band').value = FT8_DIAL_FREQUENCIES.some(b => b.hz === f) ? f : '';
         $('radio-summary').textContent = method === 'vox' ? 'none (VOX)'
             : connected ? `${radio.label}${f ? ` · ${formatMHz(f)}` : ''}`
             : 'not connected';
         let help = '';
         if (!RadioControl.available && !radio.fake && usesPort) help = 'This browser has no Web Serial. Use Chrome or Edge on a computer, or Chrome 148 or later on Android.';
         else if (method === 'vox') help = 'The page plays the transmit audio, and the radio\'s VOX must switch it to transmit. A QMX in Digi mode switches to transmit when audio arrives over USB.';
-        else if (method === 'cat') help = 'Choose the radio\'s serial port. A QMX has up to three serial ports; choose the first. The page sets the radio to Digi mode (QMX) or upper sideband (other radios), switches it between transmit and receive with the TX; and RX; commands, and can change its frequency.';
+        else if (method === 'cat') help = 'Choose the radio\'s serial port. A QMX has up to three serial ports; choose the first. The page sets the radio to Digi mode (QMX) or upper sideband (other radios) and switches it between transmit and receive with the TX; and RX; commands. To change the radio\'s frequency, use the Dial frequency list in the Audio input section.';
         else help = `Keys PTT by turning on the serial port's ${method.toUpperCase()} line while transmitting.`;
         $('radio-help').textContent = radio.error ? `${radio.error} ${help}` : help;
     }

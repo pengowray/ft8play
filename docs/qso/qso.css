@@ -96,7 +96,12 @@ h2 { font-size: 15px; margin: 0 0 6px; }
 .caption { margin: 0 0 8px; }
 
 .rx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.rx-status { margin-top: 8px; }
+/* Row 2: the chosen input's settings, each with a visible label. Row 3: Start receiving beside
+   the status and level it changes, rather than under the input choice. */
+.rx-settings, .rx-status { margin-top: 10px; }
+.rx-settings { gap: 10px 20px; }
+.field { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.field-note { color: var(--muted); font-size: 13px; }
 .source-label { font-size: 13px; color: var(--muted); }
 .source { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .source label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; }
@@ -217,5 +222,8 @@ button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weig
 /* Radio control */
 .radio summary { cursor: pointer; font-weight: 600; }
 .radio-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
-.radio-fields label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.radio-fields label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; max-width: 100%; }
+/* A list is as wide as its longest option; on a phone that is wider than the screen. */
+.radio-fields select, .rx-settings select { max-width: 100%; }
+.field { max-width: 100%; flex-wrap: wrap; }
 .radio-freq { font-variant-numeric: tabular-nums; color: var(--muted); }

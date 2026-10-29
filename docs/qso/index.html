@@ -57,14 +57,18 @@
                 <label><input type="radio" name="source" value="test" checked> Test signals</label>
                 <label><input type="radio" name="source" value="file"> Audio file</label>
             </div>
-            <select id="input-device" aria-label="Sound card input" hidden></select>
-            <select id="rtl-band" aria-label="Band and dial frequency" hidden></select>
-            <select id="soundcard-dial" aria-label="Radio dial frequency" title="Radio dial frequency, recorded in the log" hidden></select>
-            <select id="rtl-gain" aria-label="RTL-SDR gain" hidden></select>
-            <button id="rx-toggle" class="primary" type="button">Start receiving</button>
-            <input id="file-input" type="file" accept=".wav,audio/*" hidden>
+        </div>
+        <div class="rx-row rx-settings" id="rx-settings">
+            <label class="field" id="input-device-field" hidden>Input device <select id="input-device"></select></label>
+            <span class="field" id="dial-field" hidden>
+                <label for="dial">Dial frequency</label> <select id="dial"></select>
+                <span id="dial-note" class="field-note"></span>
+            </span>
+            <label class="field" id="rtl-gain-field" hidden>Gain <select id="rtl-gain"></select></label>
         </div>
         <div class="rx-row rx-status">
+            <button id="rx-toggle" class="primary" type="button">Start receiving</button>
+            <input id="file-input" type="file" accept=".wav,audio/*" hidden>
             <span id="rx-state" class="rx-state">Not receiving</span>
             <span class="level" id="level-wrap" hidden>
                 Input level <meter id="level" min="-60" max="0" low="-40" high="-6" optimum="-20" value="-60"></meter>
@@ -90,7 +94,6 @@
             <button type="button" id="radio-disconnect" hidden>Disconnect</button>
         </div>
         <div class="radio-fields" id="radio-cat-fields" hidden>
-            <label>Radio frequency <select id="radio-band"></select></label>
             <span id="radio-freq" class="radio-freq"></span>
         </div>
         <p id="radio-help" class="help"></p>

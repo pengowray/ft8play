@@ -3,10 +3,12 @@
 // show(), start(), status(), startError(), levelWarning.
 
 import { SoundCardSource, listInputDevices } from '../../sources/sound_card.js';
-import { $, store, bandOptions } from '../dom.js';
+import { bandName } from '../../bands.js';
+import { $, store, formatMHz } from '../dom.js';
 
-const HELP = 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, and choose the same dial frequency from the list so the log records it. The list does not tune the radio. The browser will ask for microphone permission.';
-const HELP_CAT = 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency. Radio control (CAT) reads the dial frequency from the radio for the log. The browser will ask for microphone permission.';
+const HELP = 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, and choose the same frequency from the Dial frequency list so the log records it. The browser will ask for microphone permission.';
+// With CAT the page sets the radio's mode itself (see radio_control.js connect).
+const HELP_CAT = 'Receives audio from a sound card input, such as a radio\'s USB audio. Choose an FT8 frequency from the Dial frequency list to tune the radio. The browser will ask for microphone permission.';
 
 export class SoundCardInput {
     kind = 'soundcard';
@@ -14,36 +16,27 @@ export class SoundCardInput {
     levelWarning = ' · clipping, lower the recording level';
 
     /**
-     * @param {{radioFrequency: () => number|null, restart: () => Promise<void>}} options
+     * @param {{dial: import('../../dial.js').Dial, cat: () => boolean, restart: () => Promise<void>}} options
+     *   cat: true while radio control reads the radio's frequency;
      *   restart: stops and starts receiving again (after the device changes)
      */
-    constructor({ radioFrequency, restart }) {
-        this.radioFrequency = radioFrequency;
+    constructor({ dial, cat, restart }) {
+        this.dial = dial;
+        this.cat = cat;
+        this.field = $('input-device-field');
         this.deviceSelect = $('input-device');
-        this.dialSelect = $('soundcard-dial');
         this.deviceSelect.addEventListener('change', async (e) => {
             store.set('inputDevice', e.target.value);
             await restart();
         });
-        // Starts unset, so a QSO isn't logged on a band the user never chose.
-        this.dialSelect.replaceChildren(new Option('Choose dial frequency', ''), ...bandOptions());
-        this.dialSelect.value = store.get('soundcardDial', '');
-        this.dialSelect.addEventListener('change', () => store.set('soundcardDial', this.dialSelect.value));
     }
 
     get help() {
-        return this.radioFrequency() ? HELP_CAT : HELP;
+        return this.cat() ? HELP_CAT : HELP;
     }
 
-    /** The radio's dial frequency as the user chose it (only used for the log), or null. */
-    get dialHz() {
-        return Number(this.dialSelect.value) || null;
-    }
-
-    /** Shows or hides this input's settings. The dial list is hidden while CAT reads the frequency. */
     show(on) {
-        this.deviceSelect.hidden = !on;
-        this.dialSelect.hidden = !on || !!this.radioFrequency();
+        this.field.hidden = !on;
         if (on && !this.deviceSelect.options.length) this.fillDeviceList();
     }
 
@@ -62,7 +55,9 @@ export class SoundCardInput {
     }
 
     status(source) {
-        return `Receiving from ${source.deviceLabel || 'sound card'}`;
+        const hz = this.dial.hz;
+        const band = bandName(hz);
+        return `Receiving from ${source.deviceLabel || 'sound card'}${hz ? ` on ${formatMHz(hz)}${band ? ` (${band})` : ''}` : ''}`;
     }
 
     startError(err) {

@@ -10,7 +10,11 @@ export const store = {
     set(key, value) { try { localStorage.setItem(`qso.${key}`, value); } catch { /* storage unavailable */ } },
 };
 
-export const formatMHz = (hz, digits = 3) => `${(hz / 1e6).toFixed(digits)} MHz`;
+/** e.g. "14.074 MHz"; more decimals only when the frequency needs them ("14.0745 MHz"). */
+export function formatMHz(hz, digits) {
+    if (digits == null) digits = hz % 1000 === 0 ? 3 : hz % 100 === 0 ? 4 : 6;
+    return `${(hz / 1e6).toFixed(digits)} MHz`;
+}
 
 /** <option>s for the FT8 dial frequencies, e.g. "20m · 14.074 MHz". */
 export function bandOptions() {

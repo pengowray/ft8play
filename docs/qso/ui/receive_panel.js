@@ -3,9 +3,9 @@
 // The status line also shows errors from the other panels (see showError).
 //
 // Each input is a module in ui/inputs/ with the same shape: kind, realSignals, help,
-// levelWarning, dialHz, show(on), start({clock, onAudio, onError}) -> source, status(source),
+// levelWarning, show(on), start({clock, onAudio, onError}) -> source, status(source),
 // startError(err) -> message or null. The audio file input has opensFile and open() instead
-// of start().
+// of start(). The Dial frequency list (DialControl) is shared by all inputs.
 //
 // Events: 'change' when a source starts or stops.
 
@@ -13,16 +13,17 @@ import { SoundCardInput } from './inputs/sound_card_input.js';
 import { RtlSdrInput } from './inputs/rtlsdr_input.js';
 import { TestSignalsInput } from './inputs/test_input.js';
 import { AudioFileInput } from './inputs/file_input.js';
+import { DialControl } from './dial_control.js';
 import { $, store } from './dom.js';
 
 export class ReceivePanel extends EventTarget {
     /**
      * @param {{clock: import('../slot_clock.js').SlotClock, pipeline: import('../rx_pipeline.js').RxPipeline,
-     *          fakeRtl?: boolean, radioFrequency?: () => number|null}} options
+     *          dial: import('../dial.js').Dial, cat: () => boolean, fakeRtl?: boolean}} options
+     *   cat: true while radio control (CAT) reads and sets the radio's frequency
      *   fakeRtl: use a simulated RTL-SDR (?fake-rtlsdr)
-     *   radioFrequency: the dial frequency read from the radio over CAT, if any
      */
-    constructor({ clock, pipeline, fakeRtl = false, radioFrequency = () => null }) {
+    constructor({ clock, pipeline, dial, cat, fakeRtl = false }) {
         super();
         this.clock = clock;
         this.pipeline = pipeline;
@@ -33,10 +34,10 @@ export class ReceivePanel extends EventTarget {
         const running = (kind) => () => (this.kind === kind ? this.source : null);
         this.inputs = {
             soundcard: new SoundCardInput({
-                radioFrequency,
+                dial, cat,
                 restart: async () => { if (this.kind === 'soundcard') { await this.stop(); await this.start(); } },
             }),
-            rtlsdr: new RtlSdrInput({ fake: fakeRtl, running: running('rtlsdr'), changed: () => this.render() }),
+            rtlsdr: new RtlSdrInput({ dial, fake: fakeRtl, running: running('rtlsdr'), changed: () => this.render() }),
             test: new TestSignalsInput(),
             file: new AudioFileInput({
                 clock, pipeline,
@@ -45,6 +46,9 @@ export class ReceivePanel extends EventTarget {
             }),
         };
 
+        this.dialControl = new DialControl({ dial, cat });
+        // The sound card's status line shows the dial frequency.
+        dial.addEventListener('change', () => { if (this.kind === 'soundcard') this.render(); });
         this.setUpSourceChoice();
         $('rx-toggle').addEventListener('click', async () => {
             if (this.input.opensFile) { this.input.open(); return; }
@@ -60,15 +64,6 @@ export class ReceivePanel extends EventTarget {
     /** True when decodes come from real signals, which can be used to correct the clock. */
     get realSignals() {
         return !!this.kind && this.inputs[this.kind].realSignals;
-    }
-
-    /**
-     * The dial frequency chosen under Audio input: the RTL-SDR's (tuned to it), or for a sound
-     * card the radio's, as the user chose it (only used for the log). Null for other inputs.
-     */
-    get dialHz() {
-        if (this.kind === 'rtlsdr' && this.source) return this.source.dialHz;
-        return this.input.dialHz;
     }
 
     get selectedKind() {
@@ -133,7 +128,7 @@ export class ReceivePanel extends EventTarget {
         const { source } = this;
         const input = this.input;
         for (const i of Object.values(this.inputs)) i.show(i === input);
-        $('source-help').textContent = input.help;
+        this.renderDialChoice();
         $('rx-toggle').textContent = input.opensFile ? 'Open audio file…' : source ? 'Stop receiving' : 'Start receiving';
         $('level-wrap').hidden = !source;
 
@@ -143,10 +138,12 @@ export class ReceivePanel extends EventTarget {
         this.dispatchEvent(new CustomEvent('change'));
     }
 
-    /** Settings that depend on radio control (called when it changes). */
+    /** The Dial frequency list and help, which depend on radio control (called when it changes). */
     renderDialChoice() {
-        this.input.show(true);
+        this.dialControl.render(this.selectedKind);
         $('source-help').textContent = this.input.help;
+        // Hide the settings row when the chosen input has no settings.
+        $('rx-settings').hidden = [...$('rx-settings').children].every((el) => el.hidden);
     }
 
     /** Input level meter; called about 10 times a second. */

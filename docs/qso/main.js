@@ -17,6 +17,7 @@ import { RadioPanel, connectPtt } from './ui/radio_panel.js';
 import { TransmitPanel } from './ui/transmit_panel.js';
 import { LogPanel } from './ui/log_panel.js';
 import { LogBook } from './logbook.js';
+import { Dial } from './dial.js';
 import { ClockDisplay } from './ui/clock_display.js';
 
 const params = new URLSearchParams(location.search);
@@ -27,8 +28,9 @@ const waterfall = new Waterfall(document.querySelector('.waterfall'));
 const transmitter = new Transmitter({ clock });
 const qso = new QsoController({ clock, transmitter });
 const radio = new RadioControl({ fake: params.has('fake-radio') });
+const dial = new Dial();
 
-const receive = new ReceivePanel({ clock, pipeline, fakeRtl: params.has('fake-rtlsdr'), radioFrequency: () => radio.frequency });
+const receive = new ReceivePanel({ clock, pipeline, dial, cat: () => !!radio.radio, fakeRtl: params.has('fake-rtlsdr') });
 const onError = (message) => receive.showError(message);
 const testMode = () => receive.testMode;
 const transmit = new TransmitPanel({ clock, transmitter, qso, radio, testMode, waterfall, onError });
@@ -37,7 +39,7 @@ const bandActivity = new BandActivity(document.querySelector('.band-activity'), 
     onSelect: (d) => transmit.select(d),
     onPick: (d) => { transmit.select(d); transmit.answerSelected(); },
 });
-new RadioPanel({ radio, onError });
+new RadioPanel({ radio, dial, onError });
 radio.addEventListener('change', () => receive.renderDialChoice());
 connectPtt({ transmitter, radio, testMode, halt: () => qso.halt(), onError });
 const logbook = new LogBook();
@@ -104,7 +106,7 @@ qso.addEventListener('logged', (e) => {
         startTime: c.startTime, endTime: c.endTime,
         dxCall: c.dxCall, dxGrid: c.dxGrid, sentReport: c.sentReport, rcvdReport: c.rcvdReport,
         myCall: qso.myCall, myGrid: qso.myGrid,
-        dialHz: test ? null : radio.frequency ?? receive.dialHz,
+        dialHz: test ? null : dial.hz,
         txFreqHz: qso.txFreqHz, mode: clock.mode.id, test,
     });
 });
@@ -121,4 +123,4 @@ receive.render();
 pipeline.start().catch((err) => onError(`Decoder failed to load: ${err.message}. Reload the page to try again.`));
 
 // For debugging from the browser console.
-window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso, radio, receive, transmit, logbook };
+window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso, radio, receive, transmit, logbook, dial };

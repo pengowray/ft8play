@@ -9,7 +9,7 @@ const TEXT = {
     count: (saved, test) => `${qsos(saved)} saved${test ? ` · ${test} test ${test === 1 ? 'QSO' : 'QSOs'}` : ''}`,
     testRow: 'Test mode',
     noDial: 'Unknown',
-    noDialTitle: 'This QSO has no band or frequency in the ADIF file. To record the band and frequency of later QSOs, choose the radio\'s dial frequency next to Sound card under Audio input, or connect radio control (CAT).',
+    noDialTitle: 'This QSO has no band or frequency in the ADIF file. To record the band and frequency of later QSOs, choose the radio\'s frequency from the Dial frequency list in the Audio input section, or connect Radio control (CAT).',
     confirmDelete: (n) => `${n === 1 ? 'Delete 1 saved QSO' : `Delete all ${n} saved QSOs`} from this browser? This cannot be undone. To keep a copy, click Cancel and use Download ADIF first.`,
     saveError: (reason) => `The log could not be saved in this browser (${reason}). Download ADIF before you close or reload the page, to keep a copy of your QSOs.`,
 };

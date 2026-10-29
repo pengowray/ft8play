@@ -1,10 +1,10 @@
-// RTL-SDR input for the receive panel: band and gain lists, and starting an RtlSdrSource
-// (or a simulated stick with ?fake-rtlsdr).
+// RTL-SDR input for the receive panel: the gain list, tuning to the Dial frequency, and
+// starting an RtlSdrSource (or a simulated stick with ?fake-rtlsdr).
 
 import { RtlSdrSource } from '../../sources/rtlsdr.js';
 import { FakeRtlProvider } from '../../sources/fake_rtlsdr.js';
 import { bandName } from '../../bands.js';
-import { $, store, bandOptions, formatMHz } from '../dom.js';
+import { $, store, formatMHz } from '../dom.js';
 
 const HELP = 'Receives from an RTL-SDR USB stick connected to an antenna, in upper sideband on the chosen FT8 frequency. HF works on an RTL-SDR Blog V3 or V4 (other sticks need a direct-sampling modification). Works in Chrome and Edge on a computer, and in Chrome on Android. When you press Start receiving, the browser asks which USB device to use.';
 const GAINS = ['auto', 0, 10, 20, 30, 40, 49];
@@ -15,16 +15,18 @@ export class RtlSdrInput {
     levelWarning = ' · overloaded, choose a lower gain';
 
     /**
-     * @param {{fake: boolean, running: () => RtlSdrSource|null, changed: () => void}} options
+     * @param {{dial: import('../../dial.js').Dial, fake: boolean, running: () => RtlSdrSource|null,
+     *          changed: () => void}} options
      *   fake: use a simulated RTL-SDR; running: the source while this input is receiving;
      *   changed: call after retuning, to update the status line
      */
-    constructor({ fake, running, changed }) {
+    constructor({ dial, fake, running, changed }) {
+        this.dial = dial;
         this.fake = fake;
         this.realSignals = !fake;
-        this.bandSelect = $('rtl-band');
+        this.field = $('rtl-gain-field');
         this.gainSelect = $('rtl-gain');
-        const { bandSelect, gainSelect } = this;
+        const { gainSelect } = this;
 
         if (!navigator.usb && !fake) {
             const rtl = document.querySelector('input[name="source"][value="rtlsdr"]');
@@ -33,17 +35,18 @@ export class RtlSdrInput {
             rtl.parentElement.classList.add('unavailable');
         }
 
-        bandSelect.replaceChildren(...bandOptions());
-        bandSelect.value = store.get('rtlDial', '14074000');
-        bandSelect.addEventListener('change', async () => {
-            store.set('rtlDial', bandSelect.value);
+        // Follow the dial, whether the user or the radio (CAT) changed it.
+        dial.addEventListener('change', async (e) => {
+            const { hz, from } = e.detail;
+            if (!hz) return;
+            if (from === 'user') store.set('rtlDial', hz);
             const source = running();
-            if (source) {
-                await source.setDial(Number(bandSelect.value));
+            if (source && source.dialHz !== hz) {
+                await source.setDial(hz);
                 changed();
             }
         });
-        gainSelect.replaceChildren(...GAINS.map((g) => new Option(g === 'auto' ? 'Gain: automatic' : `Gain: ${g} dB`, g)));
+        gainSelect.replaceChildren(...GAINS.map((g) => new Option(g === 'auto' ? 'Automatic' : `${g} dB`, g)));
         gainSelect.value = store.get('rtlGain', 'auto');
         gainSelect.addEventListener('change', async () => {
             store.set('rtlGain', gainSelect.value);
@@ -55,18 +58,15 @@ export class RtlSdrInput {
         return this.gainSelect.value === 'auto' ? null : Number(this.gainSelect.value);
     }
 
-    get dialHz() {
-        return Number(this.bandSelect.value);
-    }
-
     show(on) {
-        this.bandSelect.hidden = !on;
-        this.gainSelect.hidden = !on;
+        this.field.hidden = !on;
+        // The RTL-SDR needs a frequency: use the last one it was tuned to.
+        if (on && !this.dial.hz) this.dial.set(Number(store.get('rtlDial', '14074000')));
     }
 
     async start({ clock, onAudio, onError }) {
         const source = new RtlSdrSource({
-            clock, onAudio, dialHz: this.dialHz, gainDb: this.gainDb,
+            clock, onAudio, dialHz: this.dial.hz, gainDb: this.gainDb,
             provider: this.fake ? new FakeRtlProvider({ clock }) : undefined,
         });
         source.onError = (err) => onError(`RTL-SDR stopped: ${err.message}`);

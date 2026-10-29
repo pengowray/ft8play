@@ -9,7 +9,6 @@ export class AudioFileInput {
     realSignals = false;
     opensFile = true;
     help = 'Decodes the first 15 s of a recording. The recording must start at the beginning of a slot (:00, :15, :30 or :45 past the minute), such as a WAV file saved by WSJT-X.';
-    dialHz = null;
 
     /**
      * @param {{clock: object, pipeline: import('../../rx_pipeline.js').RxPipeline,

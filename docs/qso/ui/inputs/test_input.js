@@ -8,7 +8,6 @@ export class TestSignalsInput {
     realSignals = false;
     help = 'Simulated FT8 signals mixed with noise, for trying the page without a radio. A simulated station, WA9XYZ, calls CQ and answers your CQ.';
     levelWarning = ' · clipping, lower the recording level';
-    dialHz = null;
 
     show() {}
 
