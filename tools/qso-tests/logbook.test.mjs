@@ -92,3 +92,21 @@ test('clear deletes the saved log; a failed save is reported', () => {
     assert.equal(log2.saveError, 'QuotaExceededError');
     assert.equal(log2.entries.length, 1, 'still shown');
 });
+
+test('a QSO that failed to save survives another tab saving, and is saved with the next QSO', () => {
+    const storage = memoryStorage();
+    let failNext = true;
+    const flaky = { ...storage, setItem: (k, v) => { if (failNext) { failNext = false; throw new Error('QuotaExceededError'); } storage.setItem(k, v); } };
+    const tab1 = new LogBook({ storage: flaky });
+    tab1.add(qso({ dxCall: 'G4ABC' }));
+    assert.equal(tab1.saveError, 'QuotaExceededError');
+
+    new LogBook({ storage }).add(qso({ dxCall: 'VK2XYZ' })); // another tab
+    tab1.reload();                                          // its storage event
+    assert.deepEqual(tab1.entries.map(e => e.dxCall).sort(), ['G4ABC', 'VK2XYZ']);
+    assert.ok(tab1.toAdif().includes('G4ABC'));
+
+    tab1.add(qso({ dxCall: 'JA1XYZ' }));
+    assert.equal(tab1.saveError, '');
+    assert.deepEqual(new LogBook({ storage }).entries.map(e => e.dxCall).sort(), ['G4ABC', 'JA1XYZ', 'VK2XYZ']);
+});

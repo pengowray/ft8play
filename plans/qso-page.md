@@ -17,7 +17,6 @@ Known limits:
 - Firefox sound card input is untested. If no audio arrives, check first whether Firefox runs the input AudioWorkletNode, which has no outputs and isn't connected to the destination (one fix: give it an output and connect it). Firefox and Safari have no WebUSB or Web Serial, so no RTL-SDR or radio control there.
 - The SNR scale matches synthetic signals; comparing with current WSJT-X on the same recording is still to do.
 - The log is kept in one browser only; there is no import, no editing of a logged QSO, and no upload to LoTW, QRZ or Club Log (download the ADIF file and upload it).
-- If saving the log fails (storage full or blocked), the unsaved QSO stays in the page and in Download ADIF, but a save from another open tab reloads the list and drops it.
 - Three lists of the same dial frequencies: RTL-SDR band, sound card dial frequency (log only), and the radio panel's band (CAT). One "Dial frequency" control that tunes whatever can be tuned and records the rest would be clearer.
 - (tr)uSDX audio over its serial port, HackRF, and the WebUSB CH340 driver for Android are not started.
 - QMX: CAT command `TA` can set the transmitted tone directly in Digi mode. Sending FT8 that way would need no audio connection at all, which suits phones; worth trying.

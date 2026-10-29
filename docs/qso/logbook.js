@@ -20,14 +20,17 @@ export class LogBook extends EventTarget {
     constructor({ storage } = {}) {
         super();
         try { this.storage = storage === undefined ? globalThis.localStorage ?? null : storage; } catch { this.storage = null; }
+        this.pending = [];        // QSOs whose save failed; saved again with the next one
         this.saved = this.read();
         this.testEntries = [];
         this.saveError = this.storage ? '' : 'storage unavailable';
-        globalThis.addEventListener?.('storage', (e) => {
-            if (e.key !== STORAGE_KEY) return;
-            this.saved = this.read();
-            this.changed();
-        });
+        globalThis.addEventListener?.('storage', (e) => { if (e.key === STORAGE_KEY) this.reload(); });
+    }
+
+    /** Another tab changed the saved log: read it again, keeping QSOs not yet saved here. */
+    reload() {
+        this.saved = [...this.read(), ...this.pending];
+        this.changed();
     }
 
     /** Saved QSOs from storage, oldest first. */
@@ -40,10 +43,15 @@ export class LogBook extends EventTarget {
         }
     }
 
+    /** Saves the log with any pending QSOs added. Read again first, so a QSO logged in another tab isn't overwritten. */
     write() {
+        const list = [...this.read(), ...this.pending];
+        this.saved = list;
+        if (!this.storage) return;
         try {
-            this.storage?.setItem(STORAGE_KEY, JSON.stringify(this.saved));
-            this.saveError = this.storage ? '' : 'storage unavailable';
+            this.storage.setItem(STORAGE_KEY, JSON.stringify(list));
+            this.pending = [];
+            this.saveError = '';
         } catch (err) {
             this.saveError = err.message || String(err);
         }
@@ -59,8 +67,7 @@ export class LogBook extends EventTarget {
         if (entry.test) {
             this.testEntries.push(entry);
         } else {
-            // Read again first, so a QSO logged in another tab isn't overwritten.
-            this.saved = [...this.read(), entry];
+            this.pending.push(entry);
             this.write();
         }
         this.changed();
@@ -69,6 +76,7 @@ export class LogBook extends EventTarget {
     /** Deletes every saved QSO (and the test-mode ones). */
     clear() {
         this.saved = [];
+        this.pending = [];
         this.testEntries = [];
         try { this.storage?.removeItem(STORAGE_KEY); } catch (err) { this.saveError = err.message || String(err); }
         this.changed();
