@@ -1,20 +1,22 @@
 # Plan: two-way FT8 page (TX and RX)
 
-Status: steps 1 to 5 below are built at `docs/qso/` (live at /qso/), tested here with simulated inputs only. Written 2026-10-13, updated 2026-10-14.
+Status: steps 1 to 5 below are built at `docs/qso/` (live at /qso/), tested here with simulated inputs only. Written 2026-10-13, updated 2026-10-29.
 
 Built so far:
 - Receive: ft8_lib's decoder in wasm (`docs/ft8_rx.js`, checked against native ft8_lib on 69 recordings), slot clock with DT-based correction, inputs from a sound card, an RTL-SDR (WebUSB, `docs/vendor/webrtlsdr`), test signals, or an audio file; zoomable waterfall with decode labels; band activity.
 - Transmit: `gen_ft8wave` port, transmitter scheduled on the AudioContext clock, WSJT-X-style sequencer (Tx1 to Tx6), controller that books messages per slot, transmit panel and log; Enable transmit per session, Halt TX (button, banner, Escape).
 - Radio control: Web Serial with Kenwood TS-480 CAT (QMX, (tr)uSDX) or RTS/DTR PTT.
+- Log: saved in the browser (localStorage, `docs/qso/logbook.js`) and downloaded as ADIF (`docs/qso/adif.js`). Test-mode QSOs are shown but never saved or exported. The plan said IndexedDB; a JSON list in localStorage is enough for thousands of QSOs and needs no async code or schema versions. With a sound card and no CAT, the user picks the radio's dial frequency from a list (unset by default) so the log gets a band.
+- Clock: automatic correction from decoded DTs, or a manual correction (popover on the header's clock status).
+- Sound card input: the AudioContext runs at the device rate and `docs/qso/dsp/resample.js` converts to 12 kHz, so Firefox (which won't resample a microphone into a 12 kHz context) should work.
 - Test doubles: `?fake-rtlsdr` (simulated stick), `?fake-radio` (simulated QMX), and test signals with a simulated station (WA9XYZ) that completes QSOs.
 - Node tests: `node --test "tools/qso-tests/*.test.mjs"` (slot clock, waveform, IQ to audio, sequencer, CAT).
 
 Known limits:
 - Untested with real hardware: sound card input and output, RTL-SDR, CAT and PTT. Nothing has been transmitted on air.
-- Firefox will probably refuse the sound card input: the page asks for a 12 kHz AudioContext, and Firefox doesn't resample a microphone to a different rate (Chromium does). Fix: open the context at the device rate and decimate to 12 kHz in JS. Firefox and Safari have no WebUSB or Web Serial, so no RTL-SDR or radio control there.
-- No way to set the clock offset by hand yet (the clock line can say "set manually", but nothing sets it).
+- Firefox sound card input is untested. If no audio arrives, check first whether Firefox runs the input AudioWorkletNode, which has no outputs and isn't connected to the destination (one fix: give it an output and connect it). Firefox and Safari have no WebUSB or Web Serial, so no RTL-SDR or radio control there.
 - The SNR scale matches synthetic signals; comparing with current WSJT-X on the same recording is still to do.
-- The log is lost when the page closes (no IndexedDB or ADIF export yet).
+- The log is kept in one browser only; there is no import, no editing of a logged QSO, and no upload to LoTW, QRZ or Club Log (download the ADIF file and upload it).
 - (tr)uSDX audio over its serial port, HackRF, and the WebUSB CH340 driver for Android are not started.
 - QMX: CAT command `TA` can set the transmitted tone directly in Digi mode. Sending FT8 that way would need no audio connection at all, which suits phones; worth trying.
 
@@ -124,7 +126,7 @@ Accurate timestamps matter: DT (time offset) is measured from them, and the slot
 - Require a callsign and an explicit "Enable TX" each session; transmitting needs an amateur licence.
 
 ### 8. Logging
-- Log completed QSOs to ADIF (download), stored in IndexedDB until exported.
+- ~~Log completed QSOs to ADIF (download), stored in IndexedDB until exported.~~ Done, stored in localStorage instead.
 - Later, with a server: sync logs and recordings between devices, upload to QRZ, LoTW, Club Log, and send PSK Reporter spots (see "Hosting").
 
 ## Stage 2: radio control
