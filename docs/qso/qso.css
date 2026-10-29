@@ -168,8 +168,19 @@ button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weig
 .tx-blocker { margin: 0; color: #b42318; font-size: 13px; }
 .tx-blocker:empty { display: none; }
 .band-activity tbody tr.ba-selected td { outline: 2px solid var(--accent); outline-offset: -2px; }
+.log-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 6px; }
+.log-head h2 { margin: 0; }
+.log-count { color: var(--muted); font-size: 13px; }
+.log-actions { display: flex; gap: 8px; margin-left: auto; }
+.log-error { color: #d1242f; font-weight: 600; margin: 0 0 6px; }
+/* Six columns don't fit a phone; the table scrolls sideways instead of the page. */
+.log-scroll { overflow-x: auto; }
 .log table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.log th, .log td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); }
+.log th, .log td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.log thead th { color: var(--muted); font-weight: 600; font-size: 13px; }
+/* Test-mode QSOs (not saved) are muted so they read as different from the real log. */
+.log tr.log-test td { color: var(--muted); }
+.log td.missing { color: var(--muted); font-style: italic; }
 
 /* Radio control */
 .radio summary { cursor: pointer; font-weight: 600; }

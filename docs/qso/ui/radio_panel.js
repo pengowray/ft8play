@@ -2,7 +2,7 @@
 // when the transmitter starts and stops.
 
 import { RadioControl } from '../radio/radio_control.js';
-import { FT8_DIAL_FREQUENCIES } from '../sources/rtlsdr.js';
+import { FT8_DIAL_FREQUENCIES } from '../bands.js';
 import { $, store, bandOptions, formatMHz } from './dom.js';
 
 const POLL_MS = 2000; // read the radio's frequency this often (not while transmitting)

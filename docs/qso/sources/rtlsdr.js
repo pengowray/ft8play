@@ -8,22 +8,6 @@
 import { RTL2832U_Provider, DirectSampling } from '../../vendor/webrtlsdr/rtlsdr.js';
 import { IqToUsbAudio } from '../dsp/iq_to_audio.js';
 
-/** Common FT8 dial frequencies (upper sideband). */
-export const FT8_DIAL_FREQUENCIES = [
-    { band: '160 m', hz: 1840000 },
-    { band: '80 m', hz: 3573000 },
-    { band: '60 m', hz: 5357000 },
-    { band: '40 m', hz: 7074000 },
-    { band: '30 m', hz: 10136000 },
-    { band: '20 m', hz: 14074000 },
-    { band: '17 m', hz: 18100000 },
-    { band: '15 m', hz: 21074000 },
-    { band: '12 m', hz: 24915000 },
-    { band: '10 m', hz: 28074000 },
-    { band: '6 m', hz: 50313000 },
-    { band: '2 m', hz: 144174000 },
-];
-
 const SAMPLE_RATE = 240000;  // 20 x 12 kHz; within the RTL2832U's 225-300 kS/s range
 const OFFSET_HZ = 20000;     // tune this far above the dial, so the DC spike stays out of the audio
 const READ_SAMPLES = 24576;  // about 0.1 s per read; 49152 bytes, a multiple of the 512-byte USB packet

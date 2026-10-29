@@ -1,6 +1,6 @@
 // Small helpers shared by the page's panels.
 
-import { FT8_DIAL_FREQUENCIES } from '../sources/rtlsdr.js';
+import { FT8_DIAL_FREQUENCIES } from '../bands.js';
 
 export const $ = (id) => document.getElementById(id);
 
@@ -15,8 +15,4 @@ export const formatMHz = (hz, digits = 3) => `${(hz / 1e6).toFixed(digits)} MHz`
 /** <option>s for the FT8 dial frequencies, e.g. "20m · 14.074 MHz". */
 export function bandOptions() {
     return FT8_DIAL_FREQUENCIES.map(({ band, hz }) => new Option(`${band} · ${formatMHz(hz)}`, hz));
-}
-
-export function bandName(hz) {
-    return FT8_DIAL_FREQUENCIES.find(b => b.hz === hz)?.band ?? null;
 }

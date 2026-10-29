@@ -42,8 +42,10 @@ export class Sequencer {
      * @param {{myCall: string, myGrid?: string, maxRepeats?: number}} options
      *   maxRepeats: transmissions without an answer before giving up (WSJT-X's default
      *   watchdog is 6 minutes, 12 FT8 transmissions)
+     *   now: the time in ms, for the log (the page passes its corrected clock)
      */
-    constructor({ myCall, myGrid = '', maxRepeats = 12 }) {
+    constructor({ myCall, myGrid = '', maxRepeats = 12, now = () => Date.now() }) {
+        this.now = now;
         this.myCall = myCall.toUpperCase();
         this.myGrid = (myGrid || '').toUpperCase().slice(0, 4);
         this.maxRepeats = maxRepeats;
@@ -55,6 +57,7 @@ export class Sequencer {
         this.state = STATE.IDLE;
         this.dxCall = null;
         this.dxGrid = null;
+        this.startTime = null;      // when the QSO with dxCall began (ms)
         this.sentReport = null;     // report I send, e.g. '-11'
         this.rcvdReport = null;     // report they sent me
         this.nextKey = null;        // 'tx1'..'tx6'
@@ -102,6 +105,7 @@ export class Sequencer {
         if (!p || !p.from?.text || p.from.hashed) return false;
         this.reset();
         this.dxCall = stripHash(p.from.text);
+        this.startTime = this.now();
         this.txEven = !slotEven;
         this.sentReport = formatReport(decode.snr ?? -10);
         if (p.grid && (p.tail === 'grid' || p.kind === 'cq')) this.dxGrid = p.grid;
@@ -134,6 +138,7 @@ export class Sequencer {
             if (this.state === STATE.CQ && !this.dxCall) {
                 // First station to answer my CQ.
                 this.dxCall = from;
+                this.startTime = this.now();
                 this.sentReport = formatReport(d.snr ?? -10);
             }
             if (from !== this.dxCall) continue;
@@ -204,7 +209,8 @@ export class Sequencer {
             dxGrid: this.dxGrid,
             sentReport: this.sentReport,
             rcvdReport: this.rcvdReport,
-            time: Date.now(),
+            startTime: this.startTime,
+            endTime: this.now(),
         };
     }
 }

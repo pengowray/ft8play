@@ -9,10 +9,12 @@ import { SoundCardSource, listInputDevices } from '../sources/sound_card.js';
 import { readAudioFile } from '../sources/wav_file.js';
 import { RtlSdrSource } from '../sources/rtlsdr.js';
 import { FakeRtlProvider } from '../sources/fake_rtlsdr.js';
-import { $, store, bandOptions, bandName, formatMHz } from './dom.js';
+import { $, store, bandOptions, formatMHz } from './dom.js';
+import { bandName } from '../bands.js';
 
 const HELP = {
-    soundcard: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, for example 14.074 MHz. The browser will ask for microphone permission.',
+    soundcard: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, and choose the same dial frequency from the list so the log records it. The list does not tune the radio. The browser will ask for microphone permission.',
+    soundcardCat: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency. Radio control (CAT) reads the dial frequency from the radio for the log. The browser will ask for microphone permission.',
     rtlsdr: 'Receives from an RTL-SDR USB stick connected to an antenna, in upper sideband on the chosen FT8 frequency. HF works on an RTL-SDR Blog V3 or V4 (other sticks need a direct-sampling modification). Works in Chrome and Edge on a computer, and in Chrome on Android. When you press Start receiving, the browser asks which USB device to use.',
     test: 'Simulated FT8 signals mixed with noise, for trying the page without a radio. A simulated station, WA9XYZ, calls CQ and answers your CQ.',
     file: 'Decodes the first 15 s of a recording. The recording must start at the beginning of a slot (:00, :15, :30 or :45 past the minute), such as a WAV file saved by WSJT-X.',
@@ -22,18 +24,22 @@ const GAINS = ['auto', 0, 10, 20, 30, 40, 49];
 export class ReceivePanel extends EventTarget {
     /**
      * @param {{clock: import('../slot_clock.js').SlotClock, pipeline: import('../rx_pipeline.js').RxPipeline,
-     *          fakeRtl?: boolean}} options  fakeRtl: use a simulated RTL-SDR (?fake-rtlsdr)
+     *          fakeRtl?: boolean, radioFrequency?: () => number|null}} options
+     *   fakeRtl: use a simulated RTL-SDR (?fake-rtlsdr)
+     *   radioFrequency: the dial frequency read from the radio over CAT, if any
      */
-    constructor({ clock, pipeline, fakeRtl = false }) {
+    constructor({ clock, pipeline, fakeRtl = false, radioFrequency = () => null }) {
         super();
         this.clock = clock;
         this.pipeline = pipeline;
         this.fakeRtl = fakeRtl;
+        this.radioFrequency = radioFrequency;
         this.source = null;       // running live source
         this.kind = null;         // 'soundcard' | 'rtlsdr' | 'test' while running
         this.error = '';
         this.pendingFile = null;  // { label, seconds } while an audio file is being decoded
         this.bandSelect = $('rtl-band');
+        this.soundcardDial = $('soundcard-dial');
         this.gainSelect = $('rtl-gain');
 
         this.setUpSourceChoice();
@@ -52,9 +58,16 @@ export class ReceivePanel extends EventTarget {
         return this.kind === 'soundcard' || (this.kind === 'rtlsdr' && !this.fakeRtl);
     }
 
-    /** The RTL-SDR's dial frequency while receiving from one, else null. */
+    /**
+     * The dial frequency chosen under Audio input: the RTL-SDR's (tuned to it), or for a sound
+     * card the radio's, as the user chose it (only used for the log). Null for other inputs.
+     */
     get dialHz() {
-        return this.kind === 'rtlsdr' && this.source ? this.source.dialHz : null;
+        if (this.kind === 'rtlsdr' && this.source) return this.source.dialHz;
+        const kind = this.selectedKind;
+        if (kind === 'rtlsdr') return Number(this.bandSelect.value);
+        if (kind === 'soundcard') return Number(this.soundcardDial.value) || null;
+        return null;
     }
 
     get selectedKind() {
@@ -79,6 +92,10 @@ export class ReceivePanel extends EventTarget {
             rtl.parentElement.title = 'This browser has no WebUSB. Use Chrome or Edge on a computer, or Chrome on Android.';
             rtl.parentElement.classList.add('unavailable');
         }
+        // Starts unset, so a QSO isn't logged on a band the user never chose.
+        this.soundcardDial.replaceChildren(new Option('Choose dial frequency', ''), ...bandOptions());
+        this.soundcardDial.value = store.get('soundcardDial', '');
+        this.soundcardDial.addEventListener('change', () => store.set('soundcardDial', this.soundcardDial.value));
         $('input-device').addEventListener('change', async (e) => {
             store.set('inputDevice', e.target.value);
             if (this.kind === 'soundcard') { await this.stop(); await this.start(); }
@@ -203,9 +220,8 @@ export class ReceivePanel extends EventTarget {
     render() {
         const kind = this.selectedKind;
         const { source } = this;
-        $('source-help').textContent = HELP[kind];
         $('input-device').hidden = kind !== 'soundcard';
-        this.bandSelect.hidden = kind !== 'rtlsdr';
+        this.renderDialChoice();
         this.gainSelect.hidden = kind !== 'rtlsdr';
         if (kind === 'soundcard' && !$('input-device').options.length) this.fillDeviceList();
         $('rx-toggle').textContent = kind === 'file' ? 'Open audio file…' : source ? 'Stop receiving' : 'Start receiving';
@@ -219,6 +235,18 @@ export class ReceivePanel extends EventTarget {
         } else if (source) this.setState(`Receiving from ${source.deviceLabel || 'sound card'}`, 'running');
         else if (kind !== 'file') this.setState('Not receiving');
         this.dispatchEvent(new CustomEvent('change'));
+    }
+
+    /**
+     * The band list tunes an RTL-SDR. For a sound card, a separate list records the radio's
+     * dial frequency in the log; it is hidden while radio control reads it from the radio.
+     */
+    renderDialChoice() {
+        const kind = this.selectedKind;
+        const cat = !!this.radioFrequency();
+        this.bandSelect.hidden = kind !== 'rtlsdr';
+        this.soundcardDial.hidden = kind !== 'soundcard' || cat;
+        $('source-help').textContent = kind === 'soundcard' && cat ? HELP.soundcardCat : HELP[kind];
     }
 
     /** Input level meter; called about 10 times a second. */

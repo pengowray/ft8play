@@ -67,7 +67,7 @@ export class QsoController extends EventTarget {
     }
 
     newSequencer() {
-        this.seq = new Sequencer({ myCall: this.myCall, myGrid: this.myGrid });
+        this.seq = new Sequencer({ myCall: this.myCall, myGrid: this.myGrid, now: () => this.clock.now() });
         this.override = null;
         return this.seq;
     }

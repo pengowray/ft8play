@@ -11,11 +11,12 @@ import { BandActivity, utcTime } from './band_activity.js';
 import { Transmitter } from './tx.js';
 import { QsoController } from './qso_controller.js';
 import { RadioControl } from './radio/radio_control.js';
-import { $, store, formatMHz } from './ui/dom.js';
+import { $, store } from './ui/dom.js';
 import { ReceivePanel } from './ui/receive_panel.js';
 import { RadioPanel, connectPtt } from './ui/radio_panel.js';
 import { TransmitPanel } from './ui/transmit_panel.js';
 import { LogPanel } from './ui/log_panel.js';
+import { LogBook } from './logbook.js';
 import { ClockDisplay } from './ui/clock_display.js';
 
 const params = new URLSearchParams(location.search);
@@ -27,7 +28,7 @@ const transmitter = new Transmitter({ clock });
 const qso = new QsoController({ clock, transmitter });
 const radio = new RadioControl({ fake: params.has('fake-radio') });
 
-const receive = new ReceivePanel({ clock, pipeline, fakeRtl: params.has('fake-rtlsdr') });
+const receive = new ReceivePanel({ clock, pipeline, fakeRtl: params.has('fake-rtlsdr'), radioFrequency: () => radio.frequency });
 const onError = (message) => receive.showError(message);
 const testMode = () => receive.testMode;
 const transmit = new TransmitPanel({ clock, transmitter, qso, radio, testMode, waterfall, onError });
@@ -37,8 +38,10 @@ const bandActivity = new BandActivity(document.querySelector('.band-activity'), 
     onPick: (d) => { transmit.select(d); transmit.answerSelected(); },
 });
 new RadioPanel({ radio, onError });
+radio.addEventListener('change', () => receive.renderDialChoice());
 connectPtt({ transmitter, radio, testMode, halt: () => qso.halt(), onError });
-const log = new LogPanel();
+const logbook = new LogBook();
+new LogPanel(logbook);
 const clockDisplay = new ClockDisplay(clock);
 
 // ---- My station ----
@@ -95,8 +98,15 @@ transmitter.addLoopback((tx) => { if (receive.testMode) receive.source.hear(tx);
 
 // ---- Log ----
 qso.addEventListener('logged', (e) => {
-    const dial = radio.frequency ?? receive.dialHz;
-    log.add(e.detail, receive.testMode ? 'test mode' : dial ? formatMHz(dial) : 'unknown');
+    const c = e.detail;
+    const test = receive.testMode;
+    logbook.add({
+        startTime: c.startTime, endTime: c.endTime,
+        dxCall: c.dxCall, dxGrid: c.dxGrid, sentReport: c.sentReport, rcvdReport: c.rcvdReport,
+        myCall: qso.myCall, myGrid: qso.myGrid,
+        dialHz: test ? null : radio.frequency ?? receive.dialHz,
+        txFreqHz: qso.txFreqHz, mode: clock.mode.id, test,
+    });
 });
 
 // ---- Clock, level meter, transmit timing: about 10 times a second ----
@@ -111,4 +121,4 @@ receive.render();
 pipeline.start().catch((err) => onError(`Decoder failed to load: ${err.message}. Reload the page to try again.`));
 
 // For debugging from the browser console.
-window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso, radio, receive, transmit };
+window.qso = { clock, pipeline, waterfall, bandActivity, transmitter, controller: qso, radio, receive, transmit, logbook };

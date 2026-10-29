@@ -43,6 +43,7 @@
             </div>
             <select id="input-device" aria-label="Sound card input" hidden></select>
             <select id="rtl-band" aria-label="Band and dial frequency" hidden></select>
+            <select id="soundcard-dial" aria-label="Radio dial frequency" hidden></select>
             <select id="rtl-gain" aria-label="RTL-SDR gain" hidden></select>
             <button id="rx-toggle" class="primary" type="button">Start receiving</button>
             <input id="file-input" type="file" accept=".wav,audio/*" hidden>
@@ -141,13 +142,24 @@
     </div>
 
     <section class="log" aria-labelledby="log-heading">
-        <h2 id="log-heading">Log</h2>
+        <div class="log-head">
+            <h2 id="log-heading">Log</h2>
+            <span id="log-count" class="log-count"></span>
+            <span class="log-actions">
+                <button type="button" id="log-download" title="Download all saved QSOs as an ADIF file (.adi). QSOs made in test mode are not included.">Download ADIF</button>
+                <button type="button" id="log-delete">Delete all QSOs…</button>
+            </span>
+        </div>
+        <p id="log-error" class="log-error" role="alert" hidden></p>
+        <div class="log-scroll">
         <table>
-            <thead><tr><th scope="col">UTC</th><th scope="col">Call</th><th scope="col">Grid</th><th scope="col">Sent</th><th scope="col">Rcvd</th><th scope="col">Dial frequency</th></tr></thead>
+            <thead><tr><th scope="col">Start (UTC)</th><th scope="col">Call</th><th scope="col">Grid</th><th scope="col">Sent</th><th scope="col">Rcvd</th><th scope="col">Dial frequency</th></tr></thead>
             <tbody id="log-rows"></tbody>
         </table>
-        <p id="log-empty" class="help">No QSOs yet. Completed QSOs are listed here.</p>
-        <p class="help">The log is cleared when you close or reload the page.</p>
+        </div>
+        <p id="log-empty" class="help">No QSOs logged yet. Completed QSOs appear here, newest first.</p>
+        <p id="log-test-note" class="help" hidden>QSOs marked Test mode (shown in grey) are not saved and are not included in the ADIF file.</p>
+        <p class="help">Your log is saved in this browser only. Download ADIF to import it into logging software or upload it to LoTW, QRZ or Club Log.</p>
     </section>
 
     <details class="station">
