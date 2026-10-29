@@ -15,10 +15,20 @@ const TEXT = {
 };
 
 const pad = (n) => String(n).padStart(2, '0');
-/** e.g. "2026-10-29 07:12" (UTC). */
+/** e.g. ["2026-10-29", "07:12"] (UTC). */
 function utcDateTime(ms) {
     const d = new Date(ms);
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+    return [`${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`, `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`];
+}
+
+/** A cell made of parts that a narrow screen may put on separate lines, e.g. date and time. */
+function partsCell(parts) {
+    const td = document.createElement('td');
+    parts.forEach((text, i) => {
+        if (i) td.append(' ');
+        td.append(Object.assign(document.createElement('span'), { textContent: text }));
+    });
+    return td;
 }
 
 export class LogPanel {
@@ -63,17 +73,18 @@ export class LogPanel {
     row(q) {
         const tr = document.createElement('tr');
         if (q.test) tr.className = 'log-test';
-        for (const v of [utcDateTime(q.startTime ?? q.endTime), q.dxCall, q.dxGrid ?? '', q.sentReport ?? '', q.rcvdReport ?? '']) {
+        tr.appendChild(partsCell(utcDateTime(q.startTime ?? q.endTime)));
+        for (const v of [q.dxCall, q.dxGrid ?? '', q.sentReport ?? '', q.rcvdReport ?? '']) {
             const td = document.createElement('td');
             td.textContent = v;
             tr.appendChild(td);
         }
-        const td = document.createElement('td');
+        let td = document.createElement('td');
         if (q.test) {
             td.textContent = TEXT.testRow;
         } else if (q.dialHz) {
             const band = bandName(q.dialHz);
-            td.textContent = `${band ? `${band} · ` : ''}${formatMHz(q.dialHz)}`;
+            td = partsCell(band ? [`${band} ·`, formatMHz(q.dialHz)] : [formatMHz(q.dialHz)]);
         } else {
             td.textContent = TEXT.noDial;
             td.className = 'missing';

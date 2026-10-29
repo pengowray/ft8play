@@ -1,4 +1,6 @@
 :root {
+    /* Native controls (radios, checkboxes, sliders) follow the page theme. */
+    color-scheme: light;
     --bg: #f6f7f9;
     --panel: #ffffff;
     --text: #1b1f24;
@@ -17,6 +19,7 @@
 }
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+        color-scheme: dark;
         --bg: #0f1216;
         --panel: #171b21;
         --text: #e6e9ee;
@@ -65,14 +68,20 @@ h1 { font-size: 20px; margin: 0; }
 .slot-fill { height: 100%; width: 0; background: var(--bar-fill); }
 .slot-decode { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bar-decode); }
 .slot-label, .clock-offset { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-/* The clock status is the button that opens its own settings, so it looks like text until hovered. */
-button.clock-offset { background: none; border: none; padding: 4px 6px; min-height: 32px; text-align: left; }
-button.clock-offset:hover { color: var(--text); text-decoration: underline; }
+/* The clock status is the button that opens its own settings: a quiet outlined button, so it
+   reads as clickable without competing with the clock. Filled while its popover is open. */
+button.clock-offset { background: none; padding: 4px 8px; min-height: 32px; text-align: left; }
+button.clock-offset:hover { color: var(--text); border-color: var(--muted); }
+button.clock-offset:has(+ .clock-popover:popover-open) { background: var(--slot-bg); color: var(--text); }
 .clock-popover {
     position: fixed; inset: auto; margin: 0; width: min(360px, calc(100vw - 32px));
-    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
-    padding: 12px 14px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.25);
+    /* A muted edge as well as the shadow, which barely shows on the dark theme. */
+    background: var(--panel); color: var(--text); border: 1px solid var(--muted); border-radius: 8px;
+    padding: 12px 14px; box-shadow: 0 8px 28px rgb(0 0 0 / 0.55);
 }
+.clock-sub span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+/* The manual value is inactive while Automatic is chosen (focusing it chooses Manual). */
+.clock-popover:has(input[value="auto"]:checked) #clock-manual { opacity: 0.6; }
 .clock-choice { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .clock-choice label { display: flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; }
 .clock-choice input[type="number"] { width: 6em; }
@@ -104,6 +113,9 @@ button, select, input:not([type="radio"]) {
 button { cursor: pointer; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button:disabled { opacity: 0.5; cursor: default; }
+/* For rare or destructive actions beside a main one: text only, so the two don't look alike. */
+button.quiet { background: none; border-color: transparent; color: var(--muted); }
+button.quiet:hover:not(:disabled) { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .rx-state { font-weight: 600; }
 .rx-state.running::before { content: "● "; color: #2ea043; }
 .rx-state.error { color: #d1242f; }
@@ -153,6 +165,12 @@ button:disabled { opacity: 0.5; cursor: default; }
     .band-activity tbody td.ba-none { display: table-cell; }
     .band-activity th, .band-activity td { padding: 3px 5px; }
     .source label { padding: 8px 10px; }
+    /* Let the start time (date, time) and dial frequency (band, MHz) wrap between their parts,
+       so the six log columns fit, or nearly fit, a phone. */
+    /* (".log table" selectors: the general .log rules come later in this file.) */
+    .log table { font-size: 14px; }
+    .log table th, .log table td { padding: 3px 3px; white-space: normal; }
+    .log table td span { white-space: nowrap; }
 }
 
 /* Transmit */
@@ -185,7 +203,7 @@ button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weig
 .log-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 6px; }
 .log-head h2 { margin: 0; }
 .log-count { color: var(--muted); font-size: 13px; }
-.log-actions { display: flex; gap: 8px; margin-left: auto; }
+.log-actions { display: flex; gap: 16px; margin-left: auto; }
 .log-error { color: #d1242f; font-weight: 600; margin: 0 0 6px; }
 /* Six columns don't fit a phone; the table scrolls sideways instead of the page. */
 .log-scroll { overflow-x: auto; }

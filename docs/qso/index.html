@@ -28,14 +28,15 @@
             <div class="clock-choice">
                 <label><input type="radio" name="clock-mode" value="auto"> Automatic (from decoded messages)</label>
             </div>
-            <div class="clock-choice clock-sub">
+            <div class="clock-choice clock-sub" id="clock-auto-row">
+                <span id="clock-auto-now"></span>
                 <button type="button" id="clock-reset">Reset to 0 s</button>
             </div>
             <div class="clock-choice">
                 <label><input type="radio" name="clock-mode" value="manual"> Manual:</label>
                 <input type="number" id="clock-manual" step="0.05" min="-30" max="30" value="0" aria-label="Manual clock correction in seconds"> s
             </div>
-            <p class="help">The clock needs a correction if most decoded messages show DT far from 0, or a time website shows a difference. If your computer clock is 1.20 s ahead, enter −1.20 s.</p>
+            <p class="help">The clock needs a correction if most decoded messages show DT (time offset) far from 0, or a time website shows a difference. If your computer clock is 1.20 s ahead, enter −1.20 s.</p>
             <p class="help">A manual correction is saved in this browser. Automatic correction starts from 0 s each visit.</p>
         </div>
     </div>
@@ -58,7 +59,7 @@
             </div>
             <select id="input-device" aria-label="Sound card input" hidden></select>
             <select id="rtl-band" aria-label="Band and dial frequency" hidden></select>
-            <select id="soundcard-dial" aria-label="Radio dial frequency" hidden></select>
+            <select id="soundcard-dial" aria-label="Radio dial frequency" title="Radio dial frequency, recorded in the log" hidden></select>
             <select id="rtl-gain" aria-label="RTL-SDR gain" hidden></select>
             <button id="rx-toggle" class="primary" type="button">Start receiving</button>
             <input id="file-input" type="file" accept=".wav,audio/*" hidden>
@@ -162,7 +163,7 @@
             <span id="log-count" class="log-count"></span>
             <span class="log-actions">
                 <button type="button" id="log-download" title="Download all saved QSOs as an ADIF file (.adi). QSOs made in test mode are not included.">Download ADIF</button>
-                <button type="button" id="log-delete">Delete all QSOs…</button>
+                <button type="button" id="log-delete" class="quiet">Delete all QSOs…</button>
             </span>
         </div>
         <p id="log-error" class="log-error" role="alert" hidden></p>

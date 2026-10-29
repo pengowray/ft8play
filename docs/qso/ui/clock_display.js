@@ -12,6 +12,7 @@ const TEXT = {
     none: 'Clock: computer time',
     auto: (s) => `Clock: computer time ${signed(s)} (auto)`,
     manual: (s) => s === 0 ? 'Clock: computer time (manual)' : `Clock: computer time ${signed(s)} (manual)`,
+    autoNow: (s) => `Current correction: ${signed(s)}`,
 };
 
 export class ClockDisplay {
@@ -56,8 +57,9 @@ export class ClockDisplay {
         popover.addEventListener('beforetoggle', (e) => {
             if (e.newState !== 'open') return;
             const r = $('clock-offset').getBoundingClientRect();
+            const width = document.documentElement.clientWidth; // without the scrollbar
             popover.style.top = `${r.bottom + 4}px`;
-            popover.style.left = `${Math.max(16, Math.min(r.left, window.innerWidth - Math.min(360, window.innerWidth - 32) - 16))}px`;
+            popover.style.left = `${Math.max(16, Math.min(r.left, width - Math.min(360, width - 32) - 16))}px`;
             manual.value = (mode() === 'manual' ? clock.offsetMs / 1000 : Number(manual.value)).toFixed(2);
             this.renderCorrection();
         });
@@ -65,7 +67,10 @@ export class ClockDisplay {
     }
 
     renderCorrection() {
-        $('clock-reset').disabled = !this.clock.autoCorrect || this.clock.offsetMs === 0;
+        const { clock } = this;
+        $('clock-auto-row').hidden = !clock.autoCorrect;
+        $('clock-auto-now').textContent = TEXT.autoNow(clock.offsetMs / 1000);
+        $('clock-reset').disabled = clock.offsetMs === 0;
     }
 
     /** Called about 10 times a second. */
