@@ -2,24 +2,18 @@
 // audio file), starts and stops it, and shows the receive status line and input level.
 // The status line also shows errors from the other panels (see showError).
 //
+// Each input is a module in ui/inputs/ with the same shape: kind, realSignals, help,
+// levelWarning, dialHz, show(on), start({clock, onAudio, onError}) -> source, status(source),
+// startError(err) -> message or null. The audio file input has opensFile and open() instead
+// of start().
+//
 // Events: 'change' when a source starts or stops.
 
-import { TestSignalSource } from '../sources/test_signals.js';
-import { SoundCardSource, listInputDevices } from '../sources/sound_card.js';
-import { readAudioFile } from '../sources/wav_file.js';
-import { RtlSdrSource } from '../sources/rtlsdr.js';
-import { FakeRtlProvider } from '../sources/fake_rtlsdr.js';
-import { $, store, bandOptions, formatMHz } from './dom.js';
-import { bandName } from '../bands.js';
-
-const HELP = {
-    soundcard: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, and choose the same dial frequency from the list so the log records it. The list does not tune the radio. The browser will ask for microphone permission.',
-    soundcardCat: 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency. Radio control (CAT) reads the dial frequency from the radio for the log. The browser will ask for microphone permission.',
-    rtlsdr: 'Receives from an RTL-SDR USB stick connected to an antenna, in upper sideband on the chosen FT8 frequency. HF works on an RTL-SDR Blog V3 or V4 (other sticks need a direct-sampling modification). Works in Chrome and Edge on a computer, and in Chrome on Android. When you press Start receiving, the browser asks which USB device to use.',
-    test: 'Simulated FT8 signals mixed with noise, for trying the page without a radio. A simulated station, WA9XYZ, calls CQ and answers your CQ.',
-    file: 'Decodes the first 15 s of a recording. The recording must start at the beginning of a slot (:00, :15, :30 or :45 past the minute), such as a WAV file saved by WSJT-X.',
-};
-const GAINS = ['auto', 0, 10, 20, 30, 40, 49];
+import { SoundCardInput } from './inputs/sound_card_input.js';
+import { RtlSdrInput } from './inputs/rtlsdr_input.js';
+import { TestSignalsInput } from './inputs/test_input.js';
+import { AudioFileInput } from './inputs/file_input.js';
+import { $, store } from './dom.js';
 
 export class ReceivePanel extends EventTarget {
     /**
@@ -32,20 +26,30 @@ export class ReceivePanel extends EventTarget {
         super();
         this.clock = clock;
         this.pipeline = pipeline;
-        this.fakeRtl = fakeRtl;
-        this.radioFrequency = radioFrequency;
         this.source = null;       // running live source
-        this.kind = null;         // 'soundcard' | 'rtlsdr' | 'test' while running
+        this.kind = null;         // kind of the running input
         this.error = '';
-        this.pendingFile = null;  // { label, seconds } while an audio file is being decoded
-        this.bandSelect = $('rtl-band');
-        this.soundcardDial = $('soundcard-dial');
-        this.gainSelect = $('rtl-gain');
+
+        const running = (kind) => () => (this.kind === kind ? this.source : null);
+        this.inputs = {
+            soundcard: new SoundCardInput({
+                radioFrequency,
+                restart: async () => { if (this.kind === 'soundcard') { await this.stop(); await this.start(); } },
+            }),
+            rtlsdr: new RtlSdrInput({ fake: fakeRtl, running: running('rtlsdr'), changed: () => this.render() }),
+            test: new TestSignalsInput(),
+            file: new AudioFileInput({
+                clock, pipeline,
+                setState: (text) => { this.error = ''; this.setState(text); },
+                showError: (message) => this.showError(message),
+            }),
+        };
 
         this.setUpSourceChoice();
-        this.setUpRtlControls();
-        this.setUpButtons();
-        pipeline.addEventListener('decodes', (e) => this.onDecodes(e.detail));
+        $('rx-toggle').addEventListener('click', async () => {
+            if (this.input.opensFile) { this.input.open(); return; }
+            if (this.source) await this.stop(); else await this.start();
+        });
     }
 
     /** True while receiving the simulated test signals (nothing is really transmitted). */
@@ -55,7 +59,7 @@ export class ReceivePanel extends EventTarget {
 
     /** True when decodes come from real signals, which can be used to correct the clock. */
     get realSignals() {
-        return this.kind === 'soundcard' || (this.kind === 'rtlsdr' && !this.fakeRtl);
+        return !!this.kind && this.inputs[this.kind].realSignals;
     }
 
     /**
@@ -64,18 +68,16 @@ export class ReceivePanel extends EventTarget {
      */
     get dialHz() {
         if (this.kind === 'rtlsdr' && this.source) return this.source.dialHz;
-        const kind = this.selectedKind;
-        if (kind === 'rtlsdr') return Number(this.bandSelect.value);
-        if (kind === 'soundcard') return Number(this.soundcardDial.value) || null;
-        return null;
+        return this.input.dialHz;
     }
 
     get selectedKind() {
         return document.querySelector('input[name="source"]:checked').value;
     }
 
-    get selectedGain() {
-        return this.gainSelect.value === 'auto' ? null : Number(this.gainSelect.value);
+    /** The chosen input (which may not be running). */
+    get input() {
+        return this.inputs[this.selectedKind];
     }
 
     setUpSourceChoice() {
@@ -86,112 +88,22 @@ export class ReceivePanel extends EventTarget {
             store.set('source', this.selectedKind);
             this.render();
         }));
-        if (!navigator.usb && !this.fakeRtl) {
-            const rtl = document.querySelector('input[name="source"][value="rtlsdr"]');
-            rtl.disabled = true;
-            rtl.parentElement.title = 'This browser has no WebUSB. Use Chrome or Edge on a computer, or Chrome on Android.';
-            rtl.parentElement.classList.add('unavailable');
-        }
-        // Starts unset, so a QSO isn't logged on a band the user never chose.
-        this.soundcardDial.replaceChildren(new Option('Choose dial frequency', ''), ...bandOptions());
-        this.soundcardDial.value = store.get('soundcardDial', '');
-        this.soundcardDial.addEventListener('change', () => store.set('soundcardDial', this.soundcardDial.value));
-        $('input-device').addEventListener('change', async (e) => {
-            store.set('inputDevice', e.target.value);
-            if (this.kind === 'soundcard') { await this.stop(); await this.start(); }
-        });
-    }
-
-    setUpRtlControls() {
-        const { bandSelect, gainSelect } = this;
-        bandSelect.replaceChildren(...bandOptions());
-        bandSelect.value = store.get('rtlDial', '14074000');
-        bandSelect.addEventListener('change', async () => {
-            store.set('rtlDial', bandSelect.value);
-            if (this.kind === 'rtlsdr') {
-                await this.source.setDial(Number(bandSelect.value));
-                this.render();
-            }
-        });
-        gainSelect.replaceChildren(...GAINS.map((g) => new Option(g === 'auto' ? 'Gain: automatic' : `Gain: ${g} dB`, g)));
-        gainSelect.value = store.get('rtlGain', 'auto');
-        gainSelect.addEventListener('change', async () => {
-            store.set('rtlGain', gainSelect.value);
-            if (this.kind === 'rtlsdr') await this.source.setGain(this.selectedGain);
-        });
-    }
-
-    setUpButtons() {
-        $('rx-toggle').addEventListener('click', async () => {
-            if (this.selectedKind === 'file') { $('file-input').click(); return; }
-            if (this.source) await this.stop(); else await this.start();
-        });
-        $('file-input').addEventListener('change', async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (file) await this.decodeFile(file);
-        });
-    }
-
-    async fillDeviceList() {
-        const select = $('input-device');
-        const devices = await listInputDevices();
-        const saved = store.get('inputDevice');
-        select.replaceChildren(...devices.map((d, i) =>
-            new Option(d.label || (i === 0 ? 'Default input' : `Input ${i + 1}`), d.deviceId, false, d.deviceId === saved)));
-    }
-
-    async decodeFile(file) {
-        this.error = '';
-        this.setState(`Decoding ${file.name}…`);
-        try {
-            await this.pipeline.start();
-            const { samples, seconds } = await readAudioFile(file, this.clock.mode.sampleRate);
-            // Shown on the waterfall like live audio. The status changes to "Decoded" when the
-            // decoder's results arrive (see onDecodes).
-            this.pendingFile = { label: file.name, seconds };
-            this.pipeline.decodeRecording(samples, file.name);
-        } catch (err) {
-            this.showError(`Could not read ${file.name}: ${err.message}`);
-        }
-    }
-
-    onDecodes(result) {
-        if (!this.pendingFile || result.label !== this.pendingFile.label) return;
-        const { label, seconds } = this.pendingFile;
-        this.pendingFile = null;
-        this.setState(seconds > this.clock.mode.slotSeconds + 1
-            ? `Decoded the first 15 s of ${label} (${seconds.toFixed(0)} s long)`
-            : `Decoded ${label}`);
     }
 
     async start() {
         this.error = '';
-        const kind = this.selectedKind;
+        const input = this.input;
         const { clock, pipeline } = this;
         try {
             await pipeline.start();
             const onAudio = (samples, startTime) => pipeline.pushAudio(samples, startTime);
-            if (kind === 'test') {
-                this.source = new TestSignalSource({ clock, onAudio });
-                this.source.start();
-            } else if (kind === 'rtlsdr') {
-                this.source = new RtlSdrSource({
-                    clock, onAudio, dialHz: Number(this.bandSelect.value), gainDb: this.selectedGain,
-                    provider: this.fakeRtl ? new FakeRtlProvider({ clock }) : undefined,
-                });
-                this.source.onError = (err) => { this.showError(`RTL-SDR stopped: ${err.message}`); this.stop(); };
-                await this.source.start();
-            } else if (kind === 'soundcard') {
-                this.source = new SoundCardSource({ clock, onAudio, deviceId: store.get('inputDevice') || null });
-                await this.source.start();
-                await this.fillDeviceList(); // labels are only available after permission is granted
-            }
-            this.kind = kind;
+            const onError = (message) => { this.showError(message); this.stop(); };
+            this.source = await input.start({ clock, onAudio, onError });
+            this.kind = input.kind;
         } catch (err) {
             this.source = null;
             this.kind = null;
-            this.showError(startError(kind, err));
+            this.showError(input.startError(err) ?? `Could not start receiving: ${err.message}`);
         }
         this.render();
     }
@@ -218,35 +130,23 @@ export class ReceivePanel extends EventTarget {
     }
 
     render() {
-        const kind = this.selectedKind;
         const { source } = this;
-        $('input-device').hidden = kind !== 'soundcard';
-        this.renderDialChoice();
-        this.gainSelect.hidden = kind !== 'rtlsdr';
-        if (kind === 'soundcard' && !$('input-device').options.length) this.fillDeviceList();
-        $('rx-toggle').textContent = kind === 'file' ? 'Open audio file…' : source ? 'Stop receiving' : 'Start receiving';
+        const input = this.input;
+        for (const i of Object.values(this.inputs)) i.show(i === input);
+        $('source-help').textContent = input.help;
+        $('rx-toggle').textContent = input.opensFile ? 'Open audio file…' : source ? 'Stop receiving' : 'Start receiving';
         $('level-wrap').hidden = !source;
 
         if (this.error) this.setState(this.error, 'error');
-        else if (this.testMode) this.setState('Receiving test signals', 'running');
-        else if (source && this.kind === 'rtlsdr') {
-            const band = bandName(source.dialHz);
-            this.setState(`Receiving from ${this.fakeRtl ? 'simulated ' : ''}${source.deviceLabel} on ${formatMHz(source.dialHz)}${band ? ` (${band})` : ''}`, 'running');
-        } else if (source) this.setState(`Receiving from ${source.deviceLabel || 'sound card'}`, 'running');
-        else if (kind !== 'file') this.setState('Not receiving');
+        else if (source) this.setState(this.inputs[this.kind].status(source), 'running');
+        else if (!input.opensFile) this.setState('Not receiving');
         this.dispatchEvent(new CustomEvent('change'));
     }
 
-    /**
-     * The band list tunes an RTL-SDR. For a sound card, a separate list records the radio's
-     * dial frequency in the log; it is hidden while radio control reads it from the radio.
-     */
+    /** Settings that depend on radio control (called when it changes). */
     renderDialChoice() {
-        const kind = this.selectedKind;
-        const cat = !!this.radioFrequency();
-        this.bandSelect.hidden = kind !== 'rtlsdr';
-        this.soundcardDial.hidden = kind !== 'soundcard' || cat;
-        $('source-help').textContent = kind === 'soundcard' && cat ? HELP.soundcardCat : HELP[kind];
+        this.input.show(true);
+        $('source-help').textContent = this.input.help;
     }
 
     /** Input level meter; called about 10 times a second. */
@@ -255,20 +155,7 @@ export class ReceivePanel extends EventTarget {
         if (!source) return;
         $('level').value = Math.max(-60, Math.min(0, source.level));
         let text = Number.isFinite(source.level) ? `${source.level.toFixed(0)} dBFS` : '';
-        if (source.level > -1) text += this.kind === 'rtlsdr' ? ' · overloaded, choose a lower gain' : ' · clipping, lower the recording level';
+        if (source.level > -1) text += this.inputs[this.kind].levelWarning;
         $('level-db').textContent = text;
     }
-}
-
-function startError(kind, err) {
-    if (kind === 'soundcard' && err.name === 'NotAllowedError') {
-        return 'Microphone permission was refused. Allow it in the browser\'s site settings, then try again.';
-    }
-    if (kind === 'rtlsdr' && err.name === 'NotFoundError') {
-        return 'No RTL-SDR was chosen. Plug it in, press Start receiving, and choose it in the browser\'s list of USB devices.';
-    }
-    if (kind === 'rtlsdr' && /claim|access|busy|SecurityError/i.test(`${err.name} ${err.message}`)) {
-        return `Could not open the RTL-SDR: ${err.message}. Close any other program that is using it. On Windows, install the WinUSB driver for it with Zadig. On Linux, unload the TV driver (sudo rmmod dvb_usb_rtl28xxu) and allow access with a udev rule.`;
-    }
-    return `Could not start receiving: ${err.message}`;
 }
