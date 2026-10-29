@@ -101,7 +101,7 @@ h2 { font-size: 15px; margin: 0 0 6px; }
    level it changes, rather than under the input choice. */
 .rx-settings, .rx-status { margin-top: 10px; }
 .rx-settings { gap: 10px 20px; }
-.field { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.field { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; max-width: 100%; }
 .field-note { color: var(--muted); font-size: 13px; }
 /* "Not set" is a missing value: muted italic, like "Unknown" in the log. */
 #dial:has(option[value=""]:checked) { color: var(--muted); font-style: italic; }
@@ -231,4 +231,3 @@ button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weig
 .radio-fields label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; max-width: 100%; }
 /* A list is as wide as its longest option; on a phone that is wider than the screen. */
 .radio-fields select, .rx-settings select { max-width: 100%; }
-.field { max-width: 100%; flex-wrap: wrap; }
