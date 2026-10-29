@@ -53,18 +53,18 @@
             <span class="source-label" id="source-label">Audio input</span>
             <div class="source" role="radiogroup" aria-labelledby="source-label">
                 <label><input type="radio" name="source" value="soundcard"> Sound card</label>
-                <label><input type="radio" name="source" value="rtlsdr"> RTL-SDR</label>
+                <label><input type="radio" name="source" value="rtlsdr"> <span class="nowrap">RTL-SDR</span></label>
                 <label><input type="radio" name="source" value="test" checked> Test signals</label>
                 <label><input type="radio" name="source" value="file"> Audio file</label>
             </div>
         </div>
         <div class="rx-row rx-settings" id="rx-settings">
             <label class="field" id="input-device-field" hidden>Input device <select id="input-device"></select></label>
+            <label class="field" id="rtl-gain-field" hidden>Gain <select id="rtl-gain"></select></label>
             <span class="field" id="dial-field" hidden>
                 <label for="dial">Dial frequency</label> <select id="dial"></select>
                 <span id="dial-note" class="field-note"></span>
             </span>
-            <label class="field" id="rtl-gain-field" hidden>Gain <select id="rtl-gain"></select></label>
         </div>
         <div class="rx-row rx-status">
             <button id="rx-toggle" class="primary" type="button">Start receiving</button>
@@ -87,14 +87,11 @@
                 <option value="rts">RTS line (Digirig and similar)</option>
                 <option value="dtr">DTR line</option>
             </select></label>
-            <label>Serial speed <select id="radio-baud">
+            <label>Serial speed (baud) <select id="radio-baud">
                 <option>9600</option><option>19200</option><option>38400</option><option>57600</option><option selected>115200</option>
             </select></label>
             <button type="button" id="radio-connect">Connect</button>
             <button type="button" id="radio-disconnect" hidden>Disconnect</button>
-        </div>
-        <div class="radio-fields" id="radio-cat-fields" hidden>
-            <span id="radio-freq" class="radio-freq"></span>
         </div>
         <p id="radio-help" class="help"></p>
     </details>

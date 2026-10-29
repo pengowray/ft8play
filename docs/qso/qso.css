@@ -96,12 +96,16 @@ h2 { font-size: 15px; margin: 0 0 6px; }
 .caption { margin: 0 0 8px; }
 
 .rx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-/* Row 2: the chosen input's settings, each with a visible label. Row 3: Start receiving beside
-   the status and level it changes, rather than under the input choice. */
+/* Row 2: the chosen input's settings, each with a visible label; Dial frequency is always last,
+   so its note can't be read as another field's. Row 3: Start receiving beside the status and
+   level it changes, rather than under the input choice. */
 .rx-settings, .rx-status { margin-top: 10px; }
 .rx-settings { gap: 10px 20px; }
 .field { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 .field-note { color: var(--muted); font-size: 13px; }
+/* "Not set" is a missing value: muted italic, like "Unknown" in the log. */
+#dial:has(option[value=""]:checked) { color: var(--muted); font-style: italic; }
+.nowrap { white-space: nowrap; }
 .source-label { font-size: 13px; color: var(--muted); }
 .source { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .source label { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; }
@@ -122,6 +126,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 button.quiet { background: none; border-color: transparent; color: var(--muted); }
 button.quiet:hover:not(:disabled) { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .rx-state { font-weight: 600; }
+/* Beside Start receiving, a bold "Not receiving" looked like a second button. */
+.rx-state:not(.running):not(.error) { font-weight: 400; color: var(--muted); }
 .rx-state.running::before { content: "● "; color: #2ea043; }
 .rx-state.error { color: #d1242f; }
 .level { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
@@ -144,7 +150,7 @@ button.quiet:hover:not(:disabled) { color: var(--text); text-decoration: underli
 .band-activity th, .band-activity td { text-align: right; padding: 3px 8px; white-space: nowrap; width: 1%; }
 .band-activity .ba-msg { text-align: left; width: auto; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: normal; overflow-wrap: anywhere; }
 .band-activity thead th { color: var(--muted); font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--line); }
-.ba-slot th { text-align: left; background: var(--slot-bg); color: var(--muted); font-weight: 600; font-size: 13px; padding-top: 5px; padding-bottom: 5px; }
+.ba-slot th { text-align: left; background: var(--slot-bg); color: var(--muted); font-weight: 600; font-size: 13px; padding-top: 5px; padding-bottom: 5px; white-space: normal; }
 .ba-to-me td { background: var(--to-me-bg); font-weight: 600; }
 .ba-to-me td:first-child { box-shadow: inset 4px 0 0 var(--to-me-edge); }
 .ba-cq td { background: var(--cq-bg); }
@@ -226,4 +232,3 @@ button.halt { background: #b42318; color: #fff; border-color: #b42318; font-weig
 /* A list is as wide as its longest option; on a phone that is wider than the screen. */
 .radio-fields select, .rx-settings select { max-width: 100%; }
 .field { max-width: 100%; flex-wrap: wrap; }
-.radio-freq { font-variant-numeric: tabular-nums; color: var(--muted); }

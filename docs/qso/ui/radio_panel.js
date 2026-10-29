@@ -50,9 +50,7 @@ export class RadioPanel {
         $('radio-connect').disabled = !RadioControl.available && !radio.fake;
         $('radio-disconnect').hidden = !connected;
         $('radio-baud').parentElement.hidden = !usesPort;
-        $('radio-cat-fields').hidden = !(connected && radio.radio);
         const f = radio.frequency;
-        $('radio-freq').textContent = f ? `Dial ${formatMHz(f, 6)}` : '';
         $('radio-summary').textContent = method === 'vox' ? 'none (VOX)'
             : connected ? `${radio.label}${f ? ` · ${formatMHz(f)}` : ''}`
             : 'not connected';

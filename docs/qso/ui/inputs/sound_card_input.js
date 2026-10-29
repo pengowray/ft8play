@@ -6,7 +6,7 @@ import { SoundCardSource, listInputDevices } from '../../sources/sound_card.js';
 import { bandName } from '../../bands.js';
 import { $, store, formatMHz } from '../dom.js';
 
-const HELP = 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency, and choose the same frequency from the Dial frequency list so the log records it. The browser will ask for microphone permission.';
+const HELP = 'Receives audio from a sound card input, such as a radio\'s USB audio. Set the radio to upper sideband (USB) on an FT8 frequency. The browser will ask for microphone permission.';
 // With CAT the page sets the radio's mode itself (see radio_control.js connect).
 const HELP_CAT = 'Receives audio from a sound card input, such as a radio\'s USB audio. Choose an FT8 frequency from the Dial frequency list to tune the radio. The browser will ask for microphone permission.';
 
