@@ -22,7 +22,22 @@
             </div>
             <span id="slot-label" class="slot-label" title="Even slots start at :00 and :30 past the minute, odd slots at :15 and :45."></span>
         </div>
-        <span id="clock-offset" class="clock-offset"></span>
+        <button type="button" id="clock-offset" class="clock-offset" popovertarget="clock-popover" title="Change the clock correction (automatic or manual)"></button>
+        <div id="clock-popover" class="clock-popover" popover aria-labelledby="clock-popover-heading">
+            <h2 id="clock-popover-heading">Clock correction</h2>
+            <div class="clock-choice">
+                <label><input type="radio" name="clock-mode" value="auto"> Automatic (from decoded messages)</label>
+            </div>
+            <div class="clock-choice clock-sub">
+                <button type="button" id="clock-reset">Reset to 0 s</button>
+            </div>
+            <div class="clock-choice">
+                <label><input type="radio" name="clock-mode" value="manual"> Manual:</label>
+                <input type="number" id="clock-manual" step="0.05" min="-30" max="30" value="0" aria-label="Manual clock correction in seconds"> s
+            </div>
+            <p class="help">The clock needs a correction if most decoded messages show DT far from 0, or a time website shows a difference. If your computer clock is 1.20 s ahead, enter −1.20 s.</p>
+            <p class="help">A manual correction is saved in this browser. Automatic correction starts from 0 s each visit.</p>
+        </div>
     </div>
     <div id="tx-banner" class="tx-banner" role="status" hidden>
         <strong>Transmitting</strong> <span id="tx-banner-text"></span>

@@ -51,6 +51,18 @@ test('manual offset shifts time and stops automatic correction', () => {
     assert.equal(clock.addSlotDts(1, [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]), 0);
 });
 
+test('a fixed offset of 0 still stops automatic correction; useAutomatic starts it again', () => {
+    const { clock } = fakeClock('2026-10-14T12:00:00Z');
+    clock.setManualOffset(0);
+    assert.equal(clock.offsetSource, OFFSET_SOURCE.MANUAL);
+    assert.equal(clock.addSlotDts(1, [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]), 0);
+    clock.useAutomatic();
+    assert.equal(clock.offsetSource, OFFSET_SOURCE.NONE);
+    assert.ok(clock.addSlotDts(2, [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) < 0);
+    clock.useAutomatic();
+    assert.equal(clock.offsetMs, 0, 'reset to the device clock');
+});
+
 test('consistent positive DT moves the clock back', () => {
     const { clock } = fakeClock('2026-10-14T12:00:00Z');
     assert.equal(clock.addSlotDts(1, [0.4, 0.42]), 0, 'too few decodes');

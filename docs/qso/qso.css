@@ -65,6 +65,20 @@ h1 { font-size: 20px; margin: 0; }
 .slot-fill { height: 100%; width: 0; background: var(--bar-fill); }
 .slot-decode { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bar-decode); }
 .slot-label, .clock-offset { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* The clock status is the button that opens its own settings, so it looks like text until hovered. */
+button.clock-offset { background: none; border: none; padding: 4px 6px; min-height: 32px; text-align: left; }
+button.clock-offset:hover { color: var(--text); text-decoration: underline; }
+.clock-popover {
+    position: fixed; inset: auto; margin: 0; width: min(360px, calc(100vw - 32px));
+    background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.25);
+}
+.clock-choice { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.clock-choice label { display: flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; }
+.clock-choice input[type="number"] { width: 6em; }
+/* Reset belongs to the automatic choice, so it sits under it, lined up with the label text. */
+.clock-choice.clock-sub { margin: 0 0 8px 26px; }
+.clock-choice button { white-space: nowrap; min-height: 34px; padding: 4px 10px; }
 
 main { max-width: 1100px; margin: 0 auto; padding: 12px 16px 40px; }
 section, details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }

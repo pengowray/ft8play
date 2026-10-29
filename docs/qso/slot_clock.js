@@ -4,7 +4,7 @@
 //   - decodes: if received signals consistently arrive with DT = +0.3 s, this clock is
 //     0.3 s ahead of the stations being received, so the offset moves back by 0.3 s.
 //     (This also absorbs the audio input delay, which is what matters for receiving.)
-//   - manual: set by the user.
+//   - manual: a fixed offset set by the user, which turns the correction from decodes off.
 // No DOM use; `now` can be replaced for tests.
 
 import { MODES } from './modes.js';
@@ -71,9 +71,19 @@ export class SlotClock {
         return t - this.offsetMs;
     }
 
+    /** Uses a fixed offset (even 0) and stops correcting from decodes. */
     setManualOffset(ms) {
         this.offsetMs = ms;
-        this.offsetSource = ms === 0 ? OFFSET_SOURCE.NONE : OFFSET_SOURCE.MANUAL;
+        this.offsetSource = OFFSET_SOURCE.MANUAL;
+        this.autoCorrect = false;
+        this.dtHistory = [];
+    }
+
+    /** Back to the device clock, corrected from decodes from now on. */
+    useAutomatic() {
+        this.offsetMs = 0;
+        this.offsetSource = OFFSET_SOURCE.NONE;
+        this.autoCorrect = true;
         this.dtHistory = [];
     }
 
