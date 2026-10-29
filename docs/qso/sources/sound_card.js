@@ -1,6 +1,10 @@
 // Sound card input: a microphone or line input, or a radio's USB sound card.
-// The browser resamples to 12 kHz (AudioContext sample rate); browser audio processing
-// (echo cancellation, noise suppression, automatic gain) is turned off, since it removes FT8 signals.
+// The AudioContext runs at the device's own rate (usually 44.1 or 48 kHz; Firefox can't connect
+// a microphone to a context at another rate), and the audio is resampled to 12 kHz here.
+// Browser audio processing (echo cancellation, noise suppression, automatic gain) is turned off,
+// since it removes FT8 signals.
+
+import { Resampler } from '../dsp/resample.js';
 
 export async function listInputDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
@@ -17,7 +21,9 @@ export class SoundCardSource {
         this.clock = clock;
         this.onAudio = onAudio;
         this.deviceId = deviceId;
-        this.sampleRate = clock.mode.sampleRate;
+        this.sampleRate = clock.mode.sampleRate; // rate of the audio passed to onAudio
+        this.inputRate = null; // the AudioContext's rate, once started
+        this.resampler = null;
         this.context = null;
         this.stream = null;
         this.node = null;
@@ -41,11 +47,14 @@ export class SoundCardSource {
             },
         });
         this.deviceLabel = this.stream.getAudioTracks()[0]?.label ?? '';
-        this.context = new AudioContext({ sampleRate: this.sampleRate });
+        this.context = new AudioContext();
+        this.inputRate = this.context.sampleRate;
+        this.resampler = new Resampler(this.inputRate, this.sampleRate);
         await this.context.audioWorklet.addModule(new URL('./audio_in_worklet.js', import.meta.url));
         const source = this.context.createMediaStreamSource(this.stream);
         this.node = new AudioWorkletNode(this.context, 'input-collector', {
-            numberOfInputs: 1, numberOfOutputs: 0, processorOptions: { chunkSize: 1200 },
+            numberOfInputs: 1, numberOfOutputs: 0,
+            processorOptions: { chunkSize: Math.round(this.inputRate / 10) }, // about 100 ms
         });
         this.node.port.onmessage = (e) => this.onChunk(e.data);
         source.connect(this.node);
@@ -53,21 +62,25 @@ export class SoundCardSource {
     }
 
     onChunk({ samples, frame }) {
-        // Audio clock time of the first sample, mapped to the page clock, then corrected.
+        if (!this.context) return; // stopped while this chunk was on its way
+        // Audio clock time of the first input sample, mapped to the page clock, then corrected.
         const ts = this.context.getOutputTimestamp?.();
         let deviceMs;
         if (ts && ts.performanceTime) {
-            const perfAtFrame = ts.performanceTime + (frame / this.sampleRate - ts.contextTime) * 1000;
+            const perfAtFrame = ts.performanceTime + (frame / this.inputRate - ts.contextTime) * 1000;
             deviceMs = performance.timeOrigin + perfAtFrame;
         } else {
-            deviceMs = Date.now() - (samples.length / this.sampleRate) * 1000;
+            deviceMs = Date.now() - (samples.length / this.inputRate) * 1000;
         }
         // Input latency (time from the antenna to this sample being readable).
         deviceMs -= (this.context.baseLatency || 0) * 1000;
+        // Level of the input before resampling, so that clipping shows.
         let peak = 0;
         for (const v of samples) peak = Math.max(peak, Math.abs(v));
         this.level = 20 * Math.log10(peak || 1e-9);
-        this.onAudio(samples, deviceMs + this.clock.offsetMs);
+        const out = this.resampler.process(samples);
+        // out[0] is from a little before samples[0]; outputOffset (negative) is the difference.
+        if (out.length) this.onAudio(out, deviceMs + this.resampler.outputOffset * 1000 + this.clock.offsetMs);
     }
 
     async stop() {
@@ -76,5 +89,6 @@ export class SoundCardSource {
         this.context = null;
         this.stream = null;
         this.node = null;
+        this.resampler = null;
     }
 }
