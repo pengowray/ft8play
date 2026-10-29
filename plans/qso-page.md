@@ -6,18 +6,19 @@ Built so far:
 - Receive: ft8_lib's decoder in wasm (`docs/ft8_rx.js`, checked against native ft8_lib on 69 recordings), slot clock with DT-based correction, inputs from a sound card, an RTL-SDR (WebUSB, `docs/vendor/webrtlsdr`), test signals, or an audio file; zoomable waterfall with decode labels; band activity.
 - Transmit: `gen_ft8wave` port, transmitter scheduled on the AudioContext clock, WSJT-X-style sequencer (Tx1 to Tx6), controller that books messages per slot, transmit panel and log; Enable transmit per session, Halt TX (button, banner, Escape).
 - Radio control: Web Serial with Kenwood TS-480 CAT (QMX, (tr)uSDX) or RTS/DTR PTT.
-- Log: saved in the browser (localStorage, `docs/qso/logbook.js`) and downloaded as ADIF (`docs/qso/adif.js`). Test-mode QSOs are shown but never saved or exported. The plan said IndexedDB; a JSON list in localStorage is enough for thousands of QSOs and needs no async code or schema versions. With a sound card and no CAT, the user picks the radio's dial frequency from a list (unset by default) so the log gets a band.
+- Log: saved in the browser (localStorage, `docs/qso/logbook.js`) and downloaded as ADIF (`docs/qso/adif.js`). Test-mode QSOs are shown but never saved or exported. The plan said IndexedDB; a JSON list in localStorage is enough for thousands of QSOs and needs no async code or schema versions. A QSO that fails to save stays pending and is saved with the next one.
 - Clock: automatic correction from decoded DTs, or a manual correction (popover on the header's clock status).
 - Sound card input: the AudioContext runs at the device rate and `docs/qso/dsp/resample.js` converts to 12 kHz, so Firefox (which won't resample a microphone into a 12 kHz context) should work.
 - Test doubles: `?fake-rtlsdr` (simulated stick), `?fake-radio` (simulated QMX), and test signals with a simulated station (WA9XYZ) that completes QSOs.
-- Node tests: `node --test "tools/qso-tests/*.test.mjs"` (slot clock, waveform, IQ to audio, sequencer, CAT).
+- Dial frequency: one setting (`docs/qso/dial.js`, list in `docs/qso/ui/dial_control.js`) used by the RTL-SDR, the radio and the log. The user's choice tunes the radio (CAT) and the RTL-SDR; while CAT is connected the radio's own frequency becomes the dial and the RTL-SDR follows it. With a sound card and no CAT it starts unset and is only recorded in the log.
+- Receive panel: one module per input in `docs/qso/ui/inputs/` (sound card, RTL-SDR, test signals, audio file), all with the same shape, so a new input such as (tr)uSDX serial audio is one new module.
+- Node tests: `node --test "tools/qso-tests/*.test.mjs"` (slot clock, waveform, IQ to audio, resampler, sequencer, CAT, log and ADIF, dial).
 
 Known limits:
 - Untested with real hardware: sound card input and output, RTL-SDR, CAT and PTT. Nothing has been transmitted on air.
 - Firefox sound card input is untested. If no audio arrives, check first whether Firefox runs the input AudioWorkletNode, which has no outputs and isn't connected to the destination (one fix: give it an output and connect it). Firefox and Safari have no WebUSB or Web Serial, so no RTL-SDR or radio control there.
 - The SNR scale matches synthetic signals; comparing with current WSJT-X on the same recording is still to do.
 - The log is kept in one browser only; there is no import, no editing of a logged QSO, and no upload to LoTW, QRZ or Club Log (download the ADIF file and upload it).
-- Three lists of the same dial frequencies: RTL-SDR band, sound card dial frequency (log only), and the radio panel's band (CAT). One "Dial frequency" control that tunes whatever can be tuned and records the rest would be clearer.
 - (tr)uSDX audio over its serial port, HackRF, and the WebUSB CH340 driver for Android are not started.
 - QMX: CAT command `TA` can set the transmitted tone directly in Digi mode. Sending FT8 that way would need no audio connection at all, which suits phones; worth trying.
 
